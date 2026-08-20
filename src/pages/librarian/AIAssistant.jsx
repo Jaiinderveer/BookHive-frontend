@@ -204,7 +204,7 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
         continue
       }
 
-            // ---------------- Arrays ----------------
+      // ---------------- Arrays ----------------
       if (Array.isArray(parsed)) {
         const first = parsed[0]
 
@@ -214,9 +214,10 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 
           formatted.push({
             type: 'books',
-            title: `filteredBooks.length === 1
+            title:
+              filteredBooks.length === 1
                 ? '1 matching book'
-                : \`${filteredBooks.length} matching books\``,
+                : `${filteredBooks.length} matching books`,
             data: filteredBooks.map(normalizeBook),
             filteredByQuery: filteredBooks.length !== parsed.length,
             originalCount: parsed.length,
@@ -228,9 +229,10 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
         if (first?.name && first?.email && !isTransactionQuery) {
           formatted.push({
             type: 'members',
-            title: `parsed.length === 1
+            title:
+              parsed.length === 1
                 ? '1 member'
-                : \`${parsed.length} members\``,
+                : `${parsed.length} members`,
             data: parsed,
           })
           continue
@@ -256,9 +258,10 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           if (filtered.length > 0) {
             formatted.push({
               type: 'transactions',
-              title: `filtered.length === 1
+              title:
+                filtered.length === 1
                   ? '1 transaction'
-                  : \`${filtered.length} transactions\``,
+                  : `${filtered.length} transactions`,
               data: filtered,
             })
           } else if (isOverdueQuery || isIssuedQuery) {
@@ -303,9 +306,10 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           if (filtered.length > 0) {
             formatted.push({
               type: 'transactions',
-              title: `filtered.length === 1
+              title:
+                filtered.length === 1
                   ? '1 transaction'
-                  : \`${filtered.length} transactions\``,
+                  : `${filtered.length} transactions`,
               data: filtered,
             })
           } else if (isOverdueQuery || isIssuedQuery) {
@@ -320,9 +324,23 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           continue
         }
 
-        // NOW check for empty array (after all specific types handled)
+        // Empty arrays need an explicit response for transaction queries.
+        // Otherwise the tool result disappears and the raw AI reply becomes
+        // the only visible response ("No records found", etc.).
         if (parsed.length === 0) {
-          if (!isTransactionQuery) {
+          if (isOverdueQuery) {
+            formatted.push({
+              type: 'message',
+              title: 'No overdue books found',
+              message: 'There are currently no overdue books.',
+            })
+          } else if (isIssuedQuery) {
+            formatted.push({
+              type: 'message',
+              title: 'No issued books found',
+              message: 'There are currently no books issued.',
+            })
+          } else {
             formatted.push({
               type: 'message',
               title: 'No results',
@@ -339,7 +357,7 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
             title:
               parsed.length === 1
                 ? '1 result'
-                                : `${parsed.length} results`,
+                : `${parsed.length} results`,
             data: parsed,
           })
         }
@@ -768,284 +786,212 @@ export default function AIAssistant() {
             </Box>
           ) : (
             <Stack spacing={2}>
-                {messages.map((msg) => {
-                  const isUser = msg.role === 'user'
+              {messages.map((msg) => {
+                const isUser = msg.role === 'user'
 
-                  const structuredResults = Array.isArray(msg.toolResults)
-                    ? msg.toolResults.filter(Boolean)
-                    : []
+                const structuredResults = Array.isArray(msg.toolResults)
+                  ? msg.toolResults.filter(Boolean)
+                  : []
 
-                  /*
-                   * These tool results already have dedicated visual components.
-                   * Therefore we should NOT also print the AI's raw Markdown version
-                   * of the same data underneath/above them.
-                   */
-                  // Only count as "structured" if the result has actual displayable data.
-                  // Empty "no results" messages should NOT suppress the AI response.
-                  const hasMeaningfulData = (result) => {
-                    if (!result) return false
-                    // Message type with "no results" content is not meaningful structured data
-                    if (result.type === 'message') {
-                      const msg = (result.message || '').toLowerCase()
-                      return !msg.includes('no record') && !msg.includes('no result') && !msg.includes('no matching')
-                    }
-                    // Transactions/books/members with empty data arrays are not meaningful
-                    if (['transactions', 'books', 'members'].includes(result.type)) {
-                      return Array.isArray(result.data) && result.data.length > 0
-                    }
-                    // Dashboard, single book/member always have meaningful data
-                    return true
+                /*
+                 * These tool results already have dedicated visual components.
+                 * Therefore we should NOT also print the AI's raw Markdown version
+                 * of the same data underneath/above them.
+                 */
+                // Tool cards are the canonical representation of tool output.
+                // If a tool result exists, do not render the model's raw reply as a
+                // second representation of the same data. This prevents duplicate
+                // lists, IDs, "No records found" text, and generic summaries.
+                const hasToolResults = structuredResults.length > 0
+
+                // Filter generic completion sentences from AI responses.
+                const filterGenericCompletion = (content) => {
+                  if (!content) return ''
+                  const genericPatterns = [
+                    /^I completed the requested operations\. Please verify the results above\.\s*/i,
+                    /^Operation completed\.\s*/i,
+                    /^I have completed the requested operations\.\s*/i,
+                    /^The operation has been completed\.\s*/i,
+                    /^Request completed\.\s*/i,
+                  ]
+
+                  let filtered = content
+                  for (const pattern of genericPatterns) {
+                    filtered = filtered.replace(pattern, '')
                   }
+                  return filtered.trim()
+                }
 
-                  const hasStructuredResult = structuredResults.some((result) =>
-                    [
-                      'dashboard',
-                      'books',
-                      'members',
-                      'transactions',
-                      'member',
-                      'book',
-                      'transaction',
-                    ].includes(result.type) && hasMeaningfulData(result)
-                  )
-
-                  // Filter out generic completion sentences from AI response
-                  const filterGenericCompletion = (content) => {
-                    if (!content) return ''
-                    const genericPatterns = [
-                      /^I completed the requested operations\. Please verify the results above\.\s*/i,
-                      /^Operation completed\.\s*/i,
-                      /^I have completed the requested operations\.\s*/i,
-                      /^The operation has been completed\.\s*/i,
-                      /^Request completed\.\s*/i,
-                    ]
-                    let filtered = content
-                    for (const pattern of genericPatterns) {
-                      filtered = filtered.replace(pattern, '')
-                    }
-                    return filtered.trim()
-                  }
-
-                  // Check if any tool result already provides an empty-state message
-                  // that would make the AI's empty response redundant
-                  const hasToolEmptyState = structuredResults.some((result) => {
-                    if (!result) return false
-                    // Message type with "no records", "no overdue", "no matching" etc.
-                    if (result.type === 'message') {
-                      const msg = (result.message || '').toLowerCase()
-                      return msg.includes('no record') || 
-                             msg.includes('no result') || 
-                             msg.includes('no matching') ||
-                             msg.includes('no overdue') ||
-                             msg.includes('no book') ||
-                             msg.includes('no member') ||
-                             msg.includes('no transaction') ||
-                             msg.includes('no issued') ||
-                             msg.includes('found')
-                    }
-                    // Empty arrays for transaction/books/members queries
-                    if (['transactions', 'books', 'members'].includes(result.type)) {
-                      return Array.isArray(result.data) && result.data.length === 0
-                    }
-                    return false
-                  })
-
-                  // Check if AI content is an empty-state message (duplicate of tool result)
-                  const isAIEmptyState = (content) => {
-                    if (!content) return false
-                    const msg = content.toLowerCase()
-                    return msg.includes('no record') || 
-                           msg.includes('no result') || 
-                           msg.includes('no matching') ||
-                           msg.includes('no overdue') ||
-                           msg.includes('no book') ||
-                           msg.includes('no member') ||
-                           msg.includes('no transaction') ||
-                           msg.includes('no issued') ||
-                           msg.includes('no matching') ||
-                           msg.includes('none found') ||
-                           msg.includes('not found') ||
-                           msg.includes('no results') ||
-                           msg.includes('0 result')
-                  }
-
-                  return (
-                    <Box
-                      key={msg.id}
+                return (
+                  <Box
+                    key={msg.id}
+                    sx={{
+                      display: 'flex',
+                      flexDirection: isUser ? 'row-reverse' : 'row',
+                      alignItems: 'flex-start',
+                      gap: 1.5,
+                      width: '100%',
+                      mb: 2,
+                    }}
+                  >
+                    {/* Avatar */}
+                    <Avatar
                       sx={{
-                        display: 'flex',
-                        flexDirection: isUser ? 'row-reverse' : 'row',
-                        alignItems: 'flex-start',
-                        gap: 1.5,
-                        width: '100%',
-                        mb: 2,
+                        width: 36,
+                        height: 36,
+                        flexShrink: 0,
+                        bgcolor: isUser
+                          ? 'primary.main'
+                          : 'primary.light',
+                        color: isUser
+                          ? 'primary.contrastText'
+                          : 'primary.dark',
                       }}
                     >
-                      {/* Avatar */}
-                      <Avatar
-                        sx={{
-                          width: 36,
-                          height: 36,
-                          flexShrink: 0,
-                          bgcolor: isUser
-                            ? 'primary.main'
-                            : 'primary.light',
-                          color: isUser
-                            ? 'primary.contrastText'
-                            : 'primary.dark',
-                        }}
-                      >
-                        {isUser ? (
-                          'U'
-                        ) : (
-                          <AutoAwesomeOutlinedIcon fontSize="small" />
-                        )}
-                      </Avatar>
+                      {isUser ? (
+                        'U'
+                      ) : (
+                        <AutoAwesomeOutlinedIcon fontSize="small" />
+                      )}
+                    </Avatar>
 
-                      {/* Message area */}
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          flexDirection: 'column',
-                          alignItems: isUser ? 'flex-end' : 'flex-start',
-                          minWidth: 0,
-                          maxWidth: {
-                            xs: 'calc(100% - 50px)',
-                            md: isUser ? '75%' : '90%',
-                          },
-                          flex: hasStructuredResult ? 1 : 'initial',
-                        }}
-                      >
+                    {/* Message area */}
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: isUser ? 'flex-end' : 'flex-start',
+                        minWidth: 0,
+                        maxWidth: {
+                          xs: 'calc(100% - 50px)',
+                          md: isUser ? '75%' : '90%',
+                        },
+                        flex: hasStructuredResult ? 1 : 'initial',
+                      }}
+                    >
 
-                        {/* =========================
+                      {/* =========================
             USER MESSAGE
         ========================= */}
-                        {isUser && (
-                          <Box
+                      {isUser && (
+                        <Box
+                          sx={{
+                            backgroundColor: 'primary.main',
+                            color: 'primary.contrastText',
+                            px: 2,
+                            py: 1.2,
+                            borderRadius: '18px 18px 4px 18px',
+                            boxShadow: 2,
+                            wordBreak: 'break-word',
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
                             sx={{
-                              backgroundColor: 'primary.main',
-                              color: 'primary.contrastText',
-                              px: 2,
-                              py: 1.2,
-                              borderRadius: '18px 18px 4px 18px',
-                              boxShadow: 2,
-                              wordBreak: 'break-word',
+                              whiteSpace: 'pre-wrap',
+                              lineHeight: 1.5,
                             }}
                           >
-                            <Typography
-                              variant="body2"
-                              sx={{
-                                whiteSpace: 'pre-wrap',
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              {msg.content}
-                            </Typography>
-                          </Box>
-                        )}
+                            {msg.content}
+                          </Typography>
+                        </Box>
+                      )}
 
-                        {/* =========================
+                      {/* =========================
             AI MESSAGE
         ========================= */}
-                        {!isUser && (
-                          <>
-                            {/* Structured tool results */}
-                            {structuredResults.length > 0 && (
+                      {!isUser && (
+                        <>
+                          {/* Structured tool results */}
+                          {structuredResults.length > 0 && (
+                            <Box
+                              sx={{
+                                width: '100%',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: 1.5,
+                              }}
+                            >
+                              {structuredResults.map((tr, index) => (
+                                <ToolResultCard
+                                  key={`${msg.id}-tool-${index}`}
+                                  title={tr.title}
+                                  type={tr.type}
+                                  data={tr.data}
+                                  message={tr.message}
+                                  insights={tr.insights}
+                                  activities={tr.activities}
+                                  todayTransactions={tr.todayTransactions}
+                                  filteredByQuery={tr.filteredByQuery}
+                                  originalCount={tr.originalCount}
+                                />
+                              ))}
+                            </Box>
+                          )}
+
+                          {/* 
+                              The tool card is authoritative whenever a tool returned
+                              structured output. Only show the model's plain-text/Markdown
+                              reply when there is no tool result to render.
+                            */}
+                          {!hasToolResults && (() => {
+                            const filtered = filterGenericCompletion(msg.content)
+                            if (!filtered) return null
+
+                            return (
                               <Box
                                 sx={{
-                                  width: '100%',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  gap: 1.5,
+                                  backgroundColor: 'background.paper',
+                                  border: '1px solid',
+                                  borderColor: 'divider',
+                                  borderRadius: '4px 18px 18px 18px',
+                                  px: 2,
+                                  py: 1.5,
+                                  boxShadow: 1,
+                                  width: 'fit-content',
+                                  maxWidth: '100%',
                                 }}
                               >
-                                {structuredResults.map((tr, index) => (
-                                  <ToolResultCard
-                                    key={`${msg.id}-tool-${index}`}
-                                    title={tr.title}
-                                    type={tr.type}
-                                    data={tr.data}
-                                    message={tr.message}
-                                    insights={tr.insights}
-                                    activities={tr.activities}
-                                    todayTransactions={tr.todayTransactions}
-                                    filteredByQuery={tr.filteredByQuery}
-                                    originalCount={tr.originalCount}
-                                  />
-                                ))}
+                                <MarkdownMessage content={filtered} />
                               </Box>
-                            )}
-
-                            {/* 
-              {/*
-              Show AI response when:
-              - No meaningful structured results, OR
-              - There are structured results but AI adds value (not a duplicate empty state)
-            */}
-                            {(() => {
-                              const filtered = filterGenericCompletion(msg.content)
-                              if (!filtered) return null
-                              
-                              // Suppress AI message if tool already provided an empty-state message
-                              // and AI is just repeating the same empty-state information
-                              if (hasToolEmptyState && isAIEmptyState(filtered)) {
-                                return null
-                              }
-                              
-                              return (
-                                <Box
-                                  sx={{
-                                    backgroundColor: 'background.paper',
-                                    border: '1px solid',
-                                    borderColor: 'divider',
-                                    borderRadius: '4px 18px 18px 18px',
-                                    px: 2,
-                                    py: 1.5,
-                                    boxShadow: 1,
-                                    width: 'fit-content',
-                                    maxWidth: '100%',
-                                  }}
-                                >
-                                  <MarkdownMessage content={filtered} />
-                                </Box>
-                              )
-                            })()}{/* Error / retry */}
-                            {msg.id === failedId && (
-                              <Box
+                            )
+                          })()}
+                          {msg.id === failedId && (
+                            <Box
+                              sx={{
+                                mt: 1,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1,
+                                width: '100%',
+                              }}
+                            >
+                              <Alert
+                                severity="error"
                                 sx={{
-                                  mt: 1,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 1,
-                                  width: '100%',
+                                  flex: 1,
+                                  borderRadius: 2,
                                 }}
                               >
-                                <Alert
-                                  severity="error"
-                                  sx={{
-                                    flex: 1,
-                                    borderRadius: 2,
-                                  }}
-                                >
-                                  {error}
-                                </Alert>
+                                {error}
+                              </Alert>
 
-                                <Button
-                                  size="small"
-                                  color="primary"
-                                  onClick={handleRetry}
-                                  disabled={sending}
-                                >
-                                  Retry
-                                </Button>
-                              </Box>
-                            )}
-                          </>
-                        )}
-                      </Box>
+                              <Button
+                                size="small"
+                                color="primary"
+                                onClick={handleRetry}
+                                disabled={sending}
+                              >
+                                Retry
+                              </Button>
+                            </Box>
+                          )}
+                        </>
+                      )}
                     </Box>
-                  )
-                })}
+                  </Box>
+                )
+              })}
 
               <div ref={bottomRef} />
             </Stack>
