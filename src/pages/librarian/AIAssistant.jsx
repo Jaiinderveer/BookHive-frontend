@@ -866,7 +866,7 @@ export default function AIAssistant() {
                           xs: 'calc(100% - 50px)',
                           md: isUser ? '75%' : '90%',
                         },
-                        flex: hasStructuredResult ? 1 : 'initial',
+                        flex: hasToolResults ? 1 : 'initial',
                       }}
                     >
 
