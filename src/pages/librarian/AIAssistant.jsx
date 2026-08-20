@@ -23,11 +23,15 @@ import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
 import WarningAmberOutlinedIcon from '@mui/icons-material/WarningAmberOutlined'
 import TodayOutlinedIcon from '@mui/icons-material/TodayOutlined'
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 
 import { sendChat } from '../../services/aiService.js'
 import { getErrorMessage } from '../../services/apiClient.js'
 import PageHeader from '../../components/ui/PageHeader.jsx'
 import { useAI } from '../../context/AIContext.jsx'
+import { getBooks } from '../../services/bookService.js'
+import { getMembers } from '../../services/memberService.js'
+import { formatDate } from '../../utils/format.js'
 
 const uid = () =>
   crypto.randomUUID
@@ -77,7 +81,7 @@ function applyBookQueryFilter(books, query = '') {
   })
 }
 
-function formatToolResults(tools, userQuery = '') {
+function formatToolResults(tools, userQuery = '', books = [], members = []) {
   if (!tools || tools.length === 0) return null
 
   const formatted = []
@@ -236,7 +240,7 @@ function formatToolResults(tools, userQuery = '') {
           continue
         }
 
-        // Transactions
+        // Transactions - check for joined data first (from other tools), then raw transaction data
         if (first?.bookTitle && first?.memberName) {
           formatted.push({
             type: 'transactions',
@@ -252,6 +256,38 @@ function formatToolResults(tools, userQuery = '') {
               fine: t.fine ?? 0,
               overdue: Boolean(t.overdue),
             })),
+          })
+          continue
+        }
+
+        // Raw transactions from list_transactions tool (have book_id, member_id)
+        if (first?.book_id && first?.member_id) {
+          // Build lookup maps
+          const bookMap = new Map((books || []).map((b) => [b.id, b]))
+          const memberMap = new Map((members || []).map((m) => [m.id, m]))
+
+          const enriched = parsed.map((t) => {
+            const book = bookMap.get(t.book_id)
+            const member = memberMap.get(t.member_id)
+            return {
+              book: book?.title ?? 'Unknown Book',
+              member: member?.name ?? 'Unknown Member',
+              status: t.status ?? 'Unknown',
+              issueDate: t.issue_date,
+              dueDate: t.due_date,
+              returnDate: t.return_date,
+              fine: t.fine ?? 0,
+              overdue: t.status === 'Issued' && t.due_date ? new Date(t.due_date) < new Date() : false,
+            }
+          })
+
+          formatted.push({
+            type: 'transactions',
+            title:
+              parsed.length === 1
+                ? '1 transaction'
+                : `${parsed.length} transactions`,
+            data: enriched,
           })
           continue
         }
@@ -452,7 +488,28 @@ export default function AIAssistant() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [failedId, setFailedId] = useState(null)
+  const [books, setBooks] = useState([])
+  const [members, setMembers] = useState([])
   const bottomRef = useRef(null)
+
+  // Fetch books and members for transaction formatting
+  useEffect(() => {
+    let cancelled = false
+    Promise.all([getBooks(), getMembers()])
+      .then(([booksData, membersData]) => {
+        if (!cancelled) {
+          setBooks(booksData || [])
+          setMembers(membersData || [])
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBooks([])
+          setMembers([])
+        }
+      })
+    return () => { cancelled = true }
+  }, [])
 
   const messagesRef = useRef(messages)
   const sendingRef = useRef(sending)
@@ -481,7 +538,9 @@ export default function AIAssistant() {
 
       const toolResults = formatToolResults(
         res.tool_results || [],
-        text
+        text,
+        books,
+        members
       )
 
       addMessage({
@@ -1138,55 +1197,64 @@ function ToolResultCard({
               {title}
             </Typography>
 
-            <Stack spacing={1}>
+            <Stack spacing={1.5}>
               {data.map((item, idx) => (
-                <Card key={idx} variant="outlined" sx={{ borderRadius: 2 }}>
-                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                <Card key={idx} variant="outlined" sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider' }}>
+                  <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                     <Stack direction="row" spacing={1.5}>
-                      <Avatar
-                        sx={{
-                          bgcolor: 'warning.light',
-                          color: 'warning.dark',
-                        }}
-                      >
-                        <SwapHorizOutlinedIcon fontSize="small" />
+                      <Avatar sx={{ bgcolor: 'primary.light', color: 'primary.dark', width: 44, height: 44 }}>
+                        <MenuBookOutlinedIcon fontSize="medium" />
                       </Avatar>
 
-                      <Box sx={{ minWidth: 0 }}>
-                        <Typography fontWeight={700}>
+                      <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Typography fontWeight={700} variant="h6" gutterBottom lineHeight={1.3}>
                           {item.book}
                         </Typography>
 
-                        <Typography
-                          variant="body2"
-                          color="text.secondary"
-                        >
-                          {item.member}
-                        </Typography>
+                        <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
+                          <Typography variant="body2" color="text.secondary">
+                            <strong>👤 {item.member}</strong>
+                          </Typography>
 
-                        <Stack
-                          direction="row"
-                          spacing={1}
-                          flexWrap="wrap"
-                          mt={1}
-                        >
-                          {item.status && (
-                            <Chip
-                              size="small"
-                              label={item.status}
-                              color={
-                                item.status === 'Issued'
-                                  ? 'warning'
-                                  : 'success'
-                              }
-                            />
+                          <Typography variant="body2" color="text.secondary">
+                            📅 Issued: <strong>{formatDate(item.issueDate)}</strong>
+                          </Typography>
+
+                          <Typography variant="body2" color="text.secondary">
+                            ⏰ Due: <strong>{formatDate(item.dueDate)}</strong>
+                          </Typography>
+
+                          {item.returnDate && (
+                            <Typography variant="body2" color="text.secondary">
+                              🔁 Returned: <strong>{formatDate(item.returnDate)}</strong>
+                            </Typography>
                           )}
+
+                          <Typography variant="body2" color="text.secondary">
+                            💰 Fine: <strong>₹{Number(item.fine || 0).toFixed(2)}</strong>
+                          </Typography>
+                        </Stack>
+
+                        <Stack direction="row" spacing={1} flexWrap="wrap" mt={1}>
+                          <Chip
+                            size="small"
+                            label={item.status}
+                            color={
+                              item.status === 'Issued' ? 'warning' : 'success'
+                            }
+                            icon={
+                              item.status === 'Issued'
+                                ? <SwapHorizOutlinedIcon fontSize="small" />
+                                : <CheckCircleOutlineIcon fontSize="small" />
+                            }
+                          />
 
                           {item.overdue && (
                             <Chip
                               size="small"
                               label="Overdue"
                               color="error"
+                              icon={<WarningAmberOutlinedIcon fontSize="small" />}
                               variant="outlined"
                             />
                           )}
