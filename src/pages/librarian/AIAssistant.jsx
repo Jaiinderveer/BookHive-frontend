@@ -84,6 +84,12 @@ function applyBookQueryFilter(books, query = '') {
 function formatToolResults(tools, userQuery = '', books = [], members = []) {
   if (!tools || tools.length === 0) return null
 
+  // Detect query intent from user's question
+  const q = userQuery.toLowerCase()
+  const isOverdueQuery = /\b(overdue|past due|late)\b/.test(q)
+  const isIssuedQuery = /\b(issued|currently issued|checked out|on loan)\b/.test(q) && !isOverdueQuery
+  const isLowStockQuery = /\b(fewer|less|under|below)\s+(?:than\s+)?\d+\s+cop?y/.test(q) || /\b(low stock|out of stock)\b/.test(q)
+
   const formatted = []
 
   for (const tool of tools) {
@@ -210,8 +216,9 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 
         const first = parsed[0]
 
-        // Books
-        if (first?.title && first?.author) {
+        // Books - only show for catalog queries, not for transaction queries
+        // (overdue/issued queries should show transactions, not the full book catalog)
+        if (first?.title && first?.author && !isOverdueQuery && !isIssuedQuery) {
           const filteredBooks = applyBookQueryFilter(parsed, userQuery)
 
           formatted.push({
@@ -242,21 +249,41 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 
         // Transactions - check for joined data first (from other tools), then raw transaction data
         if (first?.bookTitle && first?.memberName) {
-          formatted.push({
-            type: 'transactions',
-            title:
-              parsed.length === 1
-                ? '1 transaction'
-                : `${parsed.length} transactions`,
-            data: parsed.map((t) => ({
-              book: t.bookTitle,
-              member: t.memberName,
-              status: t.status,
-              dueDate: t.dueDate,
-              fine: t.fine ?? 0,
-              overdue: Boolean(t.overdue),
-            })),
-          })
+          // Filter based on query intent
+          let filtered = parsed.map((t) => ({
+            book: t.bookTitle,
+            member: t.memberName,
+            status: t.status,
+            dueDate: t.dueDate,
+            fine: t.fine ?? 0,
+            overdue: Boolean(t.overdue),
+          }))
+
+          if (isOverdueQuery) {
+            filtered = filtered.filter((t) => t.overdue === true)
+          } else if (isIssuedQuery) {
+            filtered = filtered.filter((t) => t.status === 'Issued')
+          }
+
+          if (filtered.length > 0) {
+            formatted.push({
+              type: 'transactions',
+              title:
+                filtered.length === 1
+                  ? '1 transaction'
+                  : `${filtered.length} transactions`,
+              data: filtered,
+            })
+          } else if (isOverdueQuery || isIssuedQuery) {
+            // Show explicit "no results" for intent-specific queries
+            formatted.push({
+              type: 'message',
+              title: isOverdueQuery ? 'No overdue books found' : 'No issued books found',
+              message: isOverdueQuery
+                ? 'There are currently no overdue books.'
+                : 'There are currently no books issued.',
+            })
+          }
           continue
         }
 
@@ -281,14 +308,33 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
             }
           })
 
-          formatted.push({
-            type: 'transactions',
-            title:
-              parsed.length === 1
-                ? '1 transaction'
-                : `${parsed.length} transactions`,
-            data: enriched,
-          })
+          // Filter based on query intent
+          let filtered = enriched
+          if (isOverdueQuery) {
+            filtered = enriched.filter((t) => t.overdue === true)
+          } else if (isIssuedQuery) {
+            filtered = enriched.filter((t) => t.status === 'Issued')
+          }
+
+          if (filtered.length > 0) {
+            formatted.push({
+              type: 'transactions',
+              title:
+                filtered.length === 1
+                  ? '1 transaction'
+                  : `${filtered.length} transactions`,
+              data: filtered,
+            })
+          } else if (isOverdueQuery || isIssuedQuery) {
+            // Show explicit "no results" for intent-specific queries
+            formatted.push({
+              type: 'message',
+              title: isOverdueQuery ? 'No overdue books found' : 'No issued books found',
+              message: isOverdueQuery
+                ? 'There are currently no overdue books.'
+                : 'There are currently no books issued.',
+            })
+          }
           continue
         }
 
