@@ -204,30 +204,19 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
         continue
       }
 
-      // ---------------- Arrays ----------------
+            // ---------------- Arrays ----------------
       if (Array.isArray(parsed)) {
-        if (parsed.length === 0) {
-          formatted.push({
-            type: 'message',
-            title: 'No results',
-            message: 'No matching records were found.',
-          })
-          continue
-        }
-
         const first = parsed[0]
 
-        // Books - only show for catalog queries, not for transaction queries
-        // (overdue/issued queries should show transactions, not the full book catalog)
+        // Books - check BEFORE generic empty check
         if (first?.title && first?.author && !isTransactionQuery) {
           const filteredBooks = applyBookQueryFilter(parsed, userQuery)
 
           formatted.push({
             type: 'books',
-            title:
-              filteredBooks.length === 1
+            title: `filteredBooks.length === 1
                 ? '1 matching book'
-                : `${filteredBooks.length} matching books`,
+                : \`${filteredBooks.length} matching books\``,
             data: filteredBooks.map(normalizeBook),
             filteredByQuery: filteredBooks.length !== parsed.length,
             originalCount: parsed.length,
@@ -235,22 +224,20 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           continue
         }
 
-        // Members - only show for member queries, not for transaction queries
+        // Members - check BEFORE generic empty check
         if (first?.name && first?.email && !isTransactionQuery) {
           formatted.push({
             type: 'members',
-            title:
-              parsed.length === 1
+            title: `parsed.length === 1
                 ? '1 member'
-                : `${parsed.length} members`,
+                : \`${parsed.length} members\``,
             data: parsed,
           })
           continue
         }
 
-        // Transactions - check for joined data first (from other tools), then raw transaction data
+        // Transactions - joined data - check BEFORE generic empty check
         if (first?.bookTitle && first?.memberName) {
-          // Filter based on query intent
           let filtered = parsed.map((t) => ({
             book: t.bookTitle,
             member: t.memberName,
@@ -269,14 +256,12 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           if (filtered.length > 0) {
             formatted.push({
               type: 'transactions',
-              title:
-                filtered.length === 1
+              title: `filtered.length === 1
                   ? '1 transaction'
-                  : `${filtered.length} transactions`,
+                  : \`${filtered.length} transactions\``,
               data: filtered,
             })
           } else if (isOverdueQuery || isIssuedQuery) {
-            // Show explicit "no results" for intent-specific queries
             formatted.push({
               type: 'message',
               title: isOverdueQuery ? 'No overdue books found' : 'No issued books found',
@@ -288,9 +273,8 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           continue
         }
 
-        // Raw transactions from list_transactions tool (have book_id, member_id)
+        // Raw transactions from list_transactions tool - check BEFORE generic empty check
         if (first?.book_id && first?.member_id) {
-          // Build lookup maps
           const bookMap = new Map((books || []).map((b) => [b.id, b]))
           const memberMap = new Map((members || []).map((m) => [m.id, m]))
 
@@ -309,7 +293,6 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
             }
           })
 
-          // Filter based on query intent
           let filtered = enriched
           if (isOverdueQuery) {
             filtered = enriched.filter((t) => t.overdue === true)
@@ -320,20 +303,30 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           if (filtered.length > 0) {
             formatted.push({
               type: 'transactions',
-              title:
-                filtered.length === 1
+              title: `filtered.length === 1
                   ? '1 transaction'
-                  : `${filtered.length} transactions`,
+                  : \`${filtered.length} transactions\``,
               data: filtered,
             })
           } else if (isOverdueQuery || isIssuedQuery) {
-            // Show explicit "no results" for intent-specific queries
             formatted.push({
               type: 'message',
               title: isOverdueQuery ? 'No overdue books found' : 'No issued books found',
               message: isOverdueQuery
                 ? 'There are currently no overdue books.'
                 : 'There are currently no books issued.',
+            })
+          }
+          continue
+        }
+
+        // NOW check for empty array (after all specific types handled)
+        if (parsed.length === 0) {
+          if (!isTransactionQuery) {
+            formatted.push({
+              type: 'message',
+              title: 'No results',
+              message: 'No matching records were found.',
             })
           }
           continue
@@ -346,14 +339,12 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
             title:
               parsed.length === 1
                 ? '1 result'
-                : `${parsed.length} results`,
+                                : `${parsed.length} results`,
             data: parsed,
           })
         }
         continue
-      }
-
-      // ---------------- Generic object ----------------
+      }// ---------------- Generic object ----------------
       if (parsed && typeof parsed === 'object' && !isTransactionQuery) {
         formatted.push({
           type: 'object',
