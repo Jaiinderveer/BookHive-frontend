@@ -1407,6 +1407,35 @@ function ToolResultCard({
     case 'list':
     case 'object':
     default:
+      // Handle string and null/undefined before attempting object/array operations
+      if (typeof data === 'string') {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                {title}
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                {data}
+              </Typography>
+            </CardContent>
+          </Card>
+        )
+      }
+
+      if (data == null) {
+        return (
+          <Card variant="outlined" sx={{ borderRadius: 3 }}>
+            <CardContent>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                {title}
+              </Typography>
+              <Alert severity="info">No data returned.</Alert>
+            </CardContent>
+          </Card>
+        )
+      }
+
       return (
         <Card variant="outlined" sx={{ borderRadius: 3 }}>
           <CardContent>
