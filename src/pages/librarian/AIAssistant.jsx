@@ -123,36 +123,36 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
               label: 'Total Books',
               value: parsed.total_books ?? 0,
               color: 'primary',
-              icon: <MenuBookOutlinedIcon fontSize="small" />,
+              icon: 'books',
             },
             {
               label: 'Available',
               value: parsed.books_available ?? 0,
               color: 'success',
-              icon: <CheckCircleOutlineIcon fontSize="small" />,
+              icon: 'available',
             },
             {
               label: 'Issued',
               value: parsed.books_issued ?? 0,
               color: 'warning',
-              icon: <SwapHorizOutlinedIcon fontSize="small" />,
+              icon: 'issued',
             },
             {
               label: 'Members',
               value: parsed.total_members ?? 0,
               color: 'info',
-              icon: <GroupOutlinedIcon fontSize="small" />,
+              icon: 'members',
             },
             {
               label: 'Overdue',
               value: parsed.overdue_books ?? 0,
               color: 'error',
-              icon: <WarningAmberOutlinedIcon fontSize="small" />,
+              icon: 'overdue',
             },
           ],
-          insights: Array.isArray(parsed.insights) ? parsed.insights : [],
+          insights: Array.isArray(parsed.insights) ? parsed.insights.map(formatValue) : [],
           activities: Array.isArray(parsed.activities) ? parsed.activities : [],
-          todayTransactions: parsed.today_transactions ?? 0,
+          todayTransactions: formatValue(parsed.today_transactions ?? 0),
         })
         continue
       }
@@ -1128,7 +1128,7 @@ function ToolResultCard({
               <Stack spacing={1}>
                 {data.map((item, idx) => (
                   <Card
-                    key={`${item.title}-${idx}`}
+                    key={`${formatValue(item.title)}-${idx}`}
                     variant="outlined"
                     sx={{
                       borderRadius: 2.5,
@@ -1168,7 +1168,7 @@ function ToolResultCard({
                             variant="body1"
                             sx={{ wordBreak: 'break-word' }}
                           >
-                            {item.title}
+                            {formatValue(item.title)}
                           </Typography>
 
                           <Typography
@@ -1176,7 +1176,7 @@ function ToolResultCard({
                             color="text.secondary"
                             sx={{ wordBreak: 'break-word' }}
                           >
-                            {item.author}
+                            {formatValue(item.author)}
                           </Typography>
 
                           <Stack
@@ -1187,7 +1187,7 @@ function ToolResultCard({
                           >
                             <Chip
                               size="small"
-                              label={item.category}
+                              label={formatValue(item.category)}
                               variant="outlined"
                             />
 
@@ -1250,14 +1250,14 @@ function ToolResultCard({
 
                       <Box>
                         <Typography fontWeight={700}>
-                          {member.name}
+                          {formatValue(member.name)}
                         </Typography>
                         <Typography variant="body2" color="text.secondary">
-                          {member.email}
+                          {formatValue(member.email)}
                         </Typography>
                         {member.phone && (
                           <Typography variant="body2" color="text.secondary">
-                            {member.phone}
+                            {formatValue(member.phone)}
                           </Typography>
                         )}
                       </Box>
@@ -1289,25 +1289,25 @@ function ToolResultCard({
 
                       <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Typography fontWeight={700} variant="h6" gutterBottom lineHeight={1.3}>
-                          {item.book}
+                          {formatValue(item.book)}
                         </Typography>
 
                         <Stack direction="row" spacing={1.5} flexWrap="wrap" gap={1}>
                           <Typography variant="body2" color="text.secondary">
-                            <strong>👤 {item.member}</strong>
+                            <strong>👤 {formatValue(item.member)}</strong>
                           </Typography>
 
                           <Typography variant="body2" color="text.secondary">
-                            📅 Issued: <strong>{formatDate(item.issueDate)}</strong>
+                            📅 Issued: <strong>{formatValue(formatDate(item.issueDate))}</strong>
                           </Typography>
 
                           <Typography variant="body2" color="text.secondary">
-                            ⏰ Due: <strong>{formatDate(item.dueDate)}</strong>
+                            ⏰ Due: <strong>{formatValue(formatDate(item.dueDate))}</strong>
                           </Typography>
 
                           {item.returnDate && (
                             <Typography variant="body2" color="text.secondary">
-                              🔁 Returned: <strong>{formatDate(item.returnDate)}</strong>
+                              🔁 Returned: <strong>{formatValue(formatDate(item.returnDate))}</strong>
                             </Typography>
                           )}
 
@@ -1319,7 +1319,7 @@ function ToolResultCard({
                         <Stack direction="row" spacing={1} flexWrap="wrap" mt={1}>
                           <Chip
                             size="small"
-                            label={item.status}
+                            label={formatValue(item.status)}
                             color={
                               item.status === 'Issued' ? 'warning' : 'success'
                             }
@@ -1372,8 +1372,8 @@ function ToolResultCard({
               {data.map((stat, idx) => (
                 <StatCardSimple
                   key={idx}
-                  label={stat.label}
-                  value={stat.value}
+                  label={formatValue(stat.label)}
+                  value={formatValue(stat.value)}
                   color={stat.color}
                   icon={stat.icon}
                 />
@@ -1425,7 +1425,7 @@ function ToolResultCard({
     case 'message':
       return (
         <Alert severity="success" sx={{ borderRadius: 2.5 }}>
-          {message}
+          {formatValue(message)}
         </Alert>
       )
 
@@ -1564,6 +1564,29 @@ function BookRow({ item }) {
   )
 }
 
+function renderStatIcon(icon, label = '') {
+  // New messages store a serializable icon key. Older messages may contain
+  // JSON-serialized React elements from localStorage; never render those
+  // objects directly because React throws error #31.
+  const key = typeof icon === 'string'
+    ? icon
+    : String(label).toLowerCase()
+
+  if (key.includes('available')) {
+    return <CheckCircleOutlineIcon fontSize="small" />
+  }
+  if (key.includes('issued')) {
+    return <SwapHorizOutlinedIcon fontSize="small" />
+  }
+  if (key.includes('member')) {
+    return <GroupOutlinedIcon fontSize="small" />
+  }
+  if (key.includes('overdue')) {
+    return <WarningAmberOutlinedIcon fontSize="small" />
+  }
+  return <MenuBookOutlinedIcon fontSize="small" />
+}
+
 function StatCardSimple({ label, value, color, icon }) {
   const palette = {
     primary: {
@@ -1620,7 +1643,7 @@ function StatCardSimple({ label, value, color, icon }) {
             color: selected.fg,
           }}
         >
-          {icon}
+          {renderStatIcon(icon, label)}
         </Box>
 
         <Box sx={{ minWidth: 0 }}>
