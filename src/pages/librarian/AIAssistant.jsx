@@ -835,6 +835,49 @@ export default function AIAssistant() {
                     return filtered.trim()
                   }
 
+                  // Check if any tool result already provides an empty-state message
+                  // that would make the AI's empty response redundant
+                  const hasToolEmptyState = structuredResults.some((result) => {
+                    if (!result) return false
+                    // Message type with "no records", "no overdue", "no matching" etc.
+                    if (result.type === 'message') {
+                      const msg = (result.message || '').toLowerCase()
+                      return msg.includes('no record') || 
+                             msg.includes('no result') || 
+                             msg.includes('no matching') ||
+                             msg.includes('no overdue') ||
+                             msg.includes('no book') ||
+                             msg.includes('no member') ||
+                             msg.includes('no transaction') ||
+                             msg.includes('no issued') ||
+                             msg.includes('found')
+                    }
+                    // Empty arrays for transaction/books/members queries
+                    if (['transactions', 'books', 'members'].includes(result.type)) {
+                      return Array.isArray(result.data) && result.data.length === 0
+                    }
+                    return false
+                  })
+
+                  // Check if AI content is an empty-state message (duplicate of tool result)
+                  const isAIEmptyState = (content) => {
+                    if (!content) return false
+                    const msg = content.toLowerCase()
+                    return msg.includes('no record') || 
+                           msg.includes('no result') || 
+                           msg.includes('no matching') ||
+                           msg.includes('no overdue') ||
+                           msg.includes('no book') ||
+                           msg.includes('no member') ||
+                           msg.includes('no transaction') ||
+                           msg.includes('no issued') ||
+                           msg.includes('no matching') ||
+                           msg.includes('none found') ||
+                           msg.includes('not found') ||
+                           msg.includes('no results') ||
+                           msg.includes('0 result')
+                  }
+
                   return (
                     <Box
                       key={msg.id}
@@ -943,28 +986,39 @@ export default function AIAssistant() {
                             )}
 
                             {/* 
-              Only show the textual AI response when it isn't simply
-              duplicating structured tool data.
+              {/*
+              Show AI response when:
+              - No meaningful structured results, OR
+              - There are structured results but AI adds value (not a duplicate empty state)
             */}
-                            {!hasStructuredResult && msg.content && (
-                              <Box
-                                sx={{
-                                  backgroundColor: 'background.paper',
-                                  border: '1px solid',
-                                  borderColor: 'divider',
-                                  borderRadius: '4px 18px 18px 18px',
-                                  px: 2,
-                                  py: 1.5,
-                                  boxShadow: 1,
-                                  width: 'fit-content',
-                                  maxWidth: '100%',
-                                }}
-                              >
-                                <MarkdownMessage content={msg.content} />
-                              </Box>
-                            )}
-
-                            {/* Error / retry */}
+                            {(() => {
+                              const filtered = filterGenericCompletion(msg.content)
+                              if (!filtered) return null
+                              
+                              // Suppress AI message if tool already provided an empty-state message
+                              // and AI is just repeating the same empty-state information
+                              if (hasToolEmptyState && isAIEmptyState(filtered)) {
+                                return null
+                              }
+                              
+                              return (
+                                <Box
+                                  sx={{
+                                    backgroundColor: 'background.paper',
+                                    border: '1px solid',
+                                    borderColor: 'divider',
+                                    borderRadius: '4px 18px 18px 18px',
+                                    px: 2,
+                                    py: 1.5,
+                                    boxShadow: 1,
+                                    width: 'fit-content',
+                                    maxWidth: '100%',
+                                  }}
+                                >
+                                  <MarkdownMessage content={filtered} />
+                                </Box>
+                              )
+                            })()}{/* Error / retry */}
                             {msg.id === failedId && (
                               <Box
                                 sx={{
