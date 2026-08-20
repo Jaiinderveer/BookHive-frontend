@@ -89,6 +89,7 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
   const isOverdueQuery = /\b(overdue|past due|late)\b/.test(q)
   const isIssuedQuery = /\b(issued|currently issued|checked out|on loan)\b/.test(q) && !isOverdueQuery
   const isLowStockQuery = /\b(fewer|less|under|below)\s+(?:than\s+)?\d+\s+cop?y/.test(q) || /\b(low stock|out of stock)\b/.test(q)
+  const isTransactionQuery = isOverdueQuery || isIssuedQuery
 
   const formatted = []
 
@@ -218,7 +219,7 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 
         // Books - only show for catalog queries, not for transaction queries
         // (overdue/issued queries should show transactions, not the full book catalog)
-        if (first?.title && first?.author && !isOverdueQuery && !isIssuedQuery) {
+        if (first?.title && first?.author && !isTransactionQuery) {
           const filteredBooks = applyBookQueryFilter(parsed, userQuery)
 
           formatted.push({
@@ -234,8 +235,8 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           continue
         }
 
-        // Members
-        if (first?.name && first?.email) {
+        // Members - only show for member queries, not for transaction queries
+        if (first?.name && first?.email && !isTransactionQuery) {
           formatted.push({
             type: 'members',
             title:
@@ -338,20 +339,22 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           continue
         }
 
-        // Generic array
-        formatted.push({
-          type: 'list',
-          title:
-            parsed.length === 1
-              ? '1 result'
-              : `${parsed.length} results`,
-          data: parsed,
-        })
+        // Generic array - suppress for transaction queries
+        if (!isTransactionQuery) {
+          formatted.push({
+            type: 'list',
+            title:
+              parsed.length === 1
+                ? '1 result'
+                : `${parsed.length} results`,
+            data: parsed,
+          })
+        }
         continue
       }
 
       // ---------------- Generic object ----------------
-      if (parsed && typeof parsed === 'object') {
+      if (parsed && typeof parsed === 'object' && !isTransactionQuery) {
         formatted.push({
           type: 'object',
           title: 'Result',
