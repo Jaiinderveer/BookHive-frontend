@@ -19,7 +19,7 @@ export default function ResponsiveTable({ columns, rows = [], getRowKey, renderC
     return (
       <Stack spacing={1.5}>
         {rows.map((row) => (
-          <Card key={getRowKey(row)} sx={{ p: 2 }}>
+          <Card key={getRowKey(row)} sx={{ p: 2, minWidth: 0 }}>
             {renderCard(row)}
           </Card>
         ))}
