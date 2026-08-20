@@ -490,6 +490,7 @@ export default function AIAssistant() {
   const [failedId, setFailedId] = useState(null)
   const [books, setBooks] = useState([])
   const [members, setMembers] = useState([])
+  const [dataLoading, setDataLoading] = useState(true)
   const bottomRef = useRef(null)
 
   // Fetch books and members for transaction formatting
@@ -500,16 +501,44 @@ export default function AIAssistant() {
         if (!cancelled) {
           setBooks(booksData || [])
           setMembers(membersData || [])
+          setDataLoading(false)
         }
       })
       .catch(() => {
         if (!cancelled) {
           setBooks([])
           setMembers([])
+          setDataLoading(false)
         }
       })
     return () => { cancelled = true }
   }, [])
+
+  // Ensure books and members are loaded before processing tool results
+  async function ensureReferenceData() {
+    if (books.length > 0 && members.length > 0) return
+    if (dataLoading) {
+      // Wait for the initial fetch to complete
+      await new Promise(resolve => {
+        const check = setInterval(() => {
+          if (!dataLoading) {
+            clearInterval(check)
+            resolve()
+          }
+        }, 50)
+      })
+    }
+    // If still empty after initial fetch, try fetching again
+    if (books.length === 0 || members.length === 0) {
+      try {
+        const [booksData, membersData] = await Promise.all([getBooks(), getMembers()])
+        if (booksData?.length) setBooks(booksData)
+        if (membersData?.length) setMembers(membersData)
+      } catch (e) {
+        console.warn('Failed to fetch reference data for transactions:', e)
+      }
+    }
+  }
 
   const messagesRef = useRef(messages)
   const sendingRef = useRef(sending)
@@ -535,6 +564,9 @@ export default function AIAssistant() {
 
     try {
       const res = await sendChat(text, history)
+
+      // Ensure reference data (books, members) is loaded for transaction formatting
+      await ensureReferenceData()
 
       const toolResults = formatToolResults(
         res.tool_results || [],
