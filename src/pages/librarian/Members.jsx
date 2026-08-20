@@ -14,7 +14,6 @@ import SearchIcon from '@mui/icons-material/Search'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import ClearIcon from '@mui/icons-material/Clear'
 import PhoneIcon from '@mui/icons-material/Phone'
-import BadgeIcon from '@mui/icons-material/Badge'
 import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
 import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
 import Snackbar from '@mui/material/Snackbar'
@@ -149,10 +148,6 @@ export default function Members() {
                 {m.email}
               </Typography>
               <Stack direction="row" spacing={1.5} flexWrap="wrap" mt={1} alignItems="center">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: '0.75rem', fontWeight: 500 }}>
-                  <BadgeIcon fontSize="small" sx={{ color: 'text.secondary', opacity: 0.7 }} />
-                  <Typography variant="body2" component="span" sx={{ whiteSpace: 'nowrap' }}>ID #{m.membership_id}</Typography>
-                </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: '0.75rem', fontWeight: 500 }}>
                   <PhoneIcon fontSize="small" sx={{ color: 'text.secondary', opacity: 0.7 }} />
                   <Typography variant="body2" component="span" sx={{ whiteSpace: 'nowrap' }}>{m.phone}</Typography>
