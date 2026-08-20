@@ -1,0 +1,35 @@
+/* Base reset - theme handles colors via CssBaseline */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+pre {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+}
+
+/* Prevent content overflow on small screens */
+img,
+svg {
+  max-width: 100%;
+}
+
+/* Long content should wrap, never cause horizontal scroll */
+.break-words {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
