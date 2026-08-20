@@ -13,6 +13,10 @@ import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
 import FilterListIcon from '@mui/icons-material/FilterList'
 import ClearIcon from '@mui/icons-material/Clear'
+import PhoneIcon from '@mui/icons-material/Phone'
+import BadgeIcon from '@mui/icons-material/Badge'
+import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
+import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
 import Card from '@mui/material/Card'
@@ -108,9 +112,9 @@ export default function Members() {
       label: 'Account',
       render: (m) =>
         m.user_id ? (
-          <Chip size="small" color="success" variant="outlined" label="Has login" />
+          <Chip size="small" color="success" variant="outlined" label="Login enabled" />
         ) : (
-          <Chip size="small" color="warning" variant="outlined" label="No login" />
+          <Chip size="small" color="warning" variant="outlined" label="Login not enabled" />
         ),
     },
     {
@@ -144,15 +148,28 @@ export default function Members() {
               <Typography variant="body2" color="text.secondary" gutterBottom>
                 {m.email}
               </Typography>
-              <Stack direction="row" spacing={1} flexWrap="wrap" mt={1} alignItems="center">
-                <Chip size="small" variant="outlined" label={m.membership_id} />
-                <Chip size="small" variant="outlined" label={m.phone} />
-                <Chip
-                  size="small"
-                  color={hasLogin ? 'success' : 'warning'}
-                  variant="outlined"
-                  label={hasLogin ? 'Has login' : 'No login'}
-                />
+              <Stack direction="row" spacing={1.5} flexWrap="wrap" mt={1} alignItems="center">
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: '0.75rem', fontWeight: 500 }}>
+                  <BadgeIcon fontSize="small" sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                  <Typography variant="body2" component="span" sx={{ whiteSpace: 'nowrap' }}>ID #{m.membership_id}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: '0.75rem', fontWeight: 500 }}>
+                  <PhoneIcon fontSize="small" sx={{ color: 'text.secondary', opacity: 0.7 }} />
+                  <Typography variant="body2" component="span" sx={{ whiteSpace: 'nowrap' }}>{m.phone}</Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  {hasLogin ? (
+                    <>
+                      <CheckCircleOutlinedIcon fontSize="small" sx={{ color: 'success.main' }} />
+                      <Typography variant="body2" component="span" color="success.main" fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>Login enabled</Typography>
+                    </>
+                  ) : (
+                    <>
+                      <CancelOutlinedIcon fontSize="small" sx={{ color: 'error.main' }} />
+                      <Typography variant="body2" component="span" color="error.main" fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>Login not enabled</Typography>
+                    </>
+                  )}
+                </Box>
               </Stack>
             </Box>
             <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
