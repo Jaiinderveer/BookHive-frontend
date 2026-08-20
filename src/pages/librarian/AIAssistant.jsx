@@ -789,6 +789,23 @@ export default function AIAssistant() {
                    * Therefore we should NOT also print the AI's raw Markdown version
                    * of the same data underneath/above them.
                    */
+                  // Only count as "structured" if the result has actual displayable data.
+                  // Empty "no results" messages should NOT suppress the AI response.
+                  const hasMeaningfulData = (result) => {
+                    if (!result) return false
+                    // Message type with "no results" content is not meaningful structured data
+                    if (result.type === 'message') {
+                      const msg = (result.message || '').toLowerCase()
+                      return !msg.includes('no record') && !msg.includes('no result') && !msg.includes('no matching')
+                    }
+                    // Transactions/books/members with empty data arrays are not meaningful
+                    if (['transactions', 'books', 'members'].includes(result.type)) {
+                      return Array.isArray(result.data) && result.data.length > 0
+                    }
+                    // Dashboard, single book/member always have meaningful data
+                    return true
+                  }
+
                   const hasStructuredResult = structuredResults.some((result) =>
                     [
                       'dashboard',
@@ -798,8 +815,25 @@ export default function AIAssistant() {
                       'member',
                       'book',
                       'transaction',
-                    ].includes(result.type)
+                    ].includes(result.type) && hasMeaningfulData(result)
                   )
+
+                  // Filter out generic completion sentences from AI response
+                  const filterGenericCompletion = (content) => {
+                    if (!content) return ''
+                    const genericPatterns = [
+                      /^I completed the requested operations\. Please verify the results above\.\s*/i,
+                      /^Operation completed\.\s*/i,
+                      /^I have completed the requested operations\.\s*/i,
+                      /^The operation has been completed\.\s*/i,
+                      /^Request completed\.\s*/i,
+                    ]
+                    let filtered = content
+                    for (const pattern of genericPatterns) {
+                      filtered = filtered.replace(pattern, '')
+                    }
+                    return filtered.trim()
+                  }
 
                   return (
                     <Box
