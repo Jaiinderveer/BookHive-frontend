@@ -1,10 +1,18 @@
 // Date/time formatting helpers shared across the app.
+// All timestamps from backend are in UTC. Convert to Asia/Kolkata (IST) for display.
+
+const IST_TIMEZONE = 'Asia/Kolkata'
 
 export function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: IST_TIMEZONE,
+  })
 }
 
 export function formatDateTime(value) {
@@ -17,6 +25,7 @@ export function formatDateTime(value) {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    timeZone: IST_TIMEZONE,
   })
 }
 
