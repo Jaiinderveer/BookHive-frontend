@@ -1,12 +1,41 @@
 // Date/time formatting helpers shared across the app.
-// All timestamps from backend are in UTC. Convert to Asia/Kolkata (IST) for display.
+// Backend timestamps are stored in UTC. Convert to Asia/Kolkata (IST) for display.
 
 const IST_TIMEZONE = 'Asia/Kolkata'
 
+function parseBackendDate(value) {
+  if (!value) return null
+
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value
+  }
+
+  if (typeof value === 'object' && value.$date) {
+    return parseBackendDate(value.$date)
+  }
+
+  if (typeof value !== 'string' && typeof value !== 'number') {
+    return null
+  }
+
+  let normalized = String(value).trim()
+  if (!normalized) return null
+
+  // Some legacy backend responses contain naive ISO timestamps even though
+  // they represent UTC. Explicitly mark those strings as UTC before parsing.
+  const hasTimezone = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized)
+  if (!hasTimezone && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(normalized)) {
+    normalized = normalized.replace(' ', 'T') + 'Z'
+  }
+
+  const date = new Date(normalized)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 export function formatDate(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+  const date = parseBackendDate(value)
+  if (!date) return '—'
+
   return date.toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -16,9 +45,9 @@ export function formatDate(value) {
 }
 
 export function formatDateTime(value) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
+  const date = parseBackendDate(value)
+  if (!date) return '—'
+
   return date.toLocaleString(undefined, {
     year: 'numeric',
     month: 'short',
@@ -31,10 +60,8 @@ export function formatDateTime(value) {
 
 // True if the due date has passed for a still-issued transaction.
 export function isOverdue(dueDateValue, status) {
-  if (status !== 'Issued') return false
-  if (!dueDateValue) return false
-  const due = new Date(dueDateValue)
-  if (Number.isNaN(due.getTime())) return false
+  const due = parseBackendDate(dueDateValue)
+  if (status !== 'Issued' || !due) return false
   return due.getTime() < Date.now()
 }
 
