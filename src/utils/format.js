@@ -33,7 +33,7 @@ export function formatCurrency(value) {
   const amount = Number(value) || 0
   return new Intl.NumberFormat(undefined, {
     style: 'currency',
-    currency: 'USD',
+    currency: 'INR',
     minimumFractionDigits: 2,
   }).format(amount)
 }
