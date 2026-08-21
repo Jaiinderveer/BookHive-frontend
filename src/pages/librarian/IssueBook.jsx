@@ -26,6 +26,10 @@ function toDueDate(value) {
   return d.toISOString()
 }
 
+function getTodayDate() {
+  return new Date().toISOString().slice(0, 10)
+}
+
 export default function IssueBook() {
   const booksLoader = useCallback(() => getBooks(), [])
   const { data: allBooks, loading: booksLoading, error: booksError, reload: reloadBooks } = useAsync(booksLoader)
@@ -114,16 +118,19 @@ export default function IssueBook() {
                   renderInput={(params) => <TextField {...params} label="Member" required placeholder="Select a member" />}
                 />
 
-                <TextField
-                  label="Due date"
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  required
-                  fullWidth
-                  InputLabelProps={{ shrink: true }}
-                  helperText="The date the book must be returned by."
-                />
+                    <TextField
+                      label="Due date"
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      required
+                      fullWidth
+                      InputLabelProps={{ shrink: true }}
+                      inputProps={{
+                        min: getTodayDate(),
+                      }}
+                      helperText="The due date cannot be in the past."
+                    />
 
                 <Button
                   type="submit"
