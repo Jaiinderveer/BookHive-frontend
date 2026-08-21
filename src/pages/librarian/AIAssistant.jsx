@@ -58,26 +58,19 @@ function buildHistory(messages) {
  * This is intentionally conservative: the frontend never invents a filter.
  */
 function applyBookQueryFilter(books, query = '') {
-  const q = query.toLowerCase()
+  const q = String(query).toLowerCase()
 
   const match = q.match(
     /(?:fewer|less|under|below)\s+than\s+(\d+)\s+copies|\b(?:under|below)\s+(\d+)\s+copies/
   )
 
   const threshold = Number(match?.[1] ?? match?.[2])
-
   if (!Number.isFinite(threshold)) return books
 
+  // "copies" means total inventory, not currently available inventory.
   return books.filter((book) => {
-    const available =
-      book.available_quantity ??
-      book.available ??
-      book.available_copies ??
-      book.quantity_available ??
-      book.quantity ??
-      0
-
-    return Number(available) < threshold
+    const total = book.quantity ?? book.total_quantity ?? book.total ?? 0
+    return Number(total) < threshold
   })
 }
 
@@ -98,6 +91,20 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 
     const result = tool.result
     if (result == null || result === '') continue
+
+    // Legacy backend compatibility: older versions returned this literal string
+    // for an empty query. Treat it as an empty successful result, never as a
+    // generic object/error card.
+    if (typeof result === 'string' && result.trim().toLowerCase() === 'no records found.') {
+      if (isOverdueQuery) {
+        formatted.push({ type: 'message', title: 'No overdue books', message: 'There are currently no overdue books.' })
+      } else if (isIssuedQuery) {
+        formatted.push({ type: 'message', title: 'No issued books', message: 'There are currently no books issued.' })
+      } else {
+        formatted.push({ type: 'message', title: 'No results', message: 'No matching records were found.' })
+      }
+      continue
+    }
 
     try {
       const parsed = typeof result === 'string' ? JSON.parse(result) : result
@@ -194,7 +201,9 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
         parsed &&
         typeof parsed === 'object' &&
         !Array.isArray(parsed) &&
-        parsed.message
+        parsed.message &&
+        tool.tool !== 'issue_book' &&
+        tool.tool !== 'return_book'
       ) {
         formatted.push({
           type: 'message',
@@ -362,13 +371,48 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
           })
         }
         continue
-      }// ---------------- Generic object ----------------
-      if (parsed && typeof parsed === 'object' && !isTransactionQuery) {
-        formatted.push({
-          type: 'object',
-          title: 'Result',
-          data: parsed,
-        })
+      }
+
+      // ---------------- Operation-specific objects ----------------
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        if (tool.tool === 'create_book' && parsed.title) {
+          formatted.push({
+            type: 'book',
+            title: 'Book Created',
+            data: normalizeBook(parsed),
+          })
+          continue
+        }
+
+        if (tool.tool === 'issue_book' || tool.tool === 'return_book') {
+          const bookTitle = parsed.bookTitle ?? parsed.book_title
+          const memberName = parsed.memberName ?? parsed.member_name
+          if (bookTitle || memberName || parsed.status) {
+            formatted.push({
+              type: 'transactions',
+              title: '1 transaction',
+              data: [{
+                book: bookTitle ?? 'Unknown Book',
+                member: memberName ?? 'Unknown Member',
+                status: parsed.status ?? (tool.tool === 'issue_book' ? 'Issued' : 'Returned'),
+                issueDate: parsed.issueDate ?? parsed.issue_date,
+                dueDate: parsed.dueDate ?? parsed.due_date,
+                returnDate: parsed.returnDate ?? parsed.return_date,
+                fine: parsed.fine ?? 0,
+                overdue: Boolean(parsed.overdue),
+              }],
+            })
+            continue
+          }
+        }
+
+        if (!isTransactionQuery) {
+          formatted.push({
+            type: 'object',
+            title: 'Result',
+            data: removeInternalIds(parsed),
+          })
+        }
       }
     } catch (e) {
       console.warn('Failed to parse tool result:', e, result)
@@ -376,12 +420,39 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
       formatted.push({
         type: 'object',
         title: 'Result',
-        data: result,
+        data: typeof result === 'string' ? result : removeInternalIds(result),
       })
     }
   }
 
-  return formatted.length > 0 ? formatted : null
+  // Prevent duplicate empty-state/result cards when the model/backend returns
+  // the same successful tool result more than once.
+  const unique = formatted.filter((item, index, arr) => {
+    if (item?.type !== 'message') return true
+    const key = `${item.type}|${item.title}|${item.message}`
+    return arr.findIndex((candidate) =>
+      candidate?.type === 'message' &&
+      `${candidate.type}|${candidate.title}|${candidate.message}` === key
+    ) === index
+  })
+
+  return unique.length > 0 ? unique : null
+}
+
+function removeInternalIds(value) {
+  const hiddenKeys = new Set(['id', '_id', 'book_id', 'member_id', 'transaction_id', 'created_at'])
+
+  if (Array.isArray(value)) return value.map(removeInternalIds)
+
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !hiddenKeys.has(key))
+        .map(([key, val]) => [key, removeInternalIds(val)])
+    )
+  }
+
+  return value
 }
 
 function normalizeBook(book) {
@@ -1475,7 +1546,7 @@ function ToolResultCard({
                     <CardContent sx={{ p: 1.5 }}>
                       <Typography variant="body2">
                         {typeof item === 'object'
-                          ? Object.entries(item)
+                          ? Object.entries(removeInternalIds(item))
                             .map(([key, value]) => `${formatLabel(key)}: ${formatValue(value)}`)
                             .join(' • ')
                           : String(item)}
@@ -1486,7 +1557,7 @@ function ToolResultCard({
               </Stack>
             ) : (
               <Stack spacing={1}>
-                {Object.entries(data || {}).map(([key, value]) => (
+                {Object.entries(removeInternalIds(data || {})).map(([key, value]) => (
                   <Box
                     key={key}
                     sx={{
