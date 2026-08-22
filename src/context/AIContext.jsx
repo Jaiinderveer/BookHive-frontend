@@ -61,6 +61,31 @@ function AIProvider({ children }) {
     }
   }, [messages])
 
+  // Drop the conversation whenever the session changes (logout, or a different
+  // user signing in on a shared machine). Tool results can contain member PII,
+  // so both the in-memory copy and the persisted copy must go.
+  //
+  // NOTE: this relies on AIProvider being mounted for the app's lifetime
+  // (see main.jsx). AuthContext dispatches the event; it cannot call useAI()
+  // because it is the parent provider.
+  useEffect(() => {
+    const onSessionCleared = () => {
+      setMessages([])
+      setError(null)
+      setSuggestedPrompts([])
+
+      try {
+        localStorage.removeItem(AI_STORAGE_KEY)
+      } catch {
+        // Ignore storage errors.
+      }
+    }
+
+    window.addEventListener('bookhive:session-cleared', onSessionCleared)
+    return () =>
+      window.removeEventListener('bookhive:session-cleared', onSessionCleared)
+  }, [])
+
   // Add a message to the conversation.
   const addMessage = useCallback((message) => {
     if (!message || typeof message !== 'object') {

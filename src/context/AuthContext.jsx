@@ -5,6 +5,13 @@ import { isTokenExpired } from '../services/apiClient.js'
 
 const AuthContext = createContext(null)
 
+// Tell session-scoped stores (e.g. the AI conversation) to drop their data.
+// Used on logout and on a fresh sign-in so one user's data can never be shown
+// to the next user on a shared machine.
+function notifySessionCleared() {
+  window.dispatchEvent(new CustomEvent('bookhive:session-cleared'))
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY))
@@ -85,6 +92,9 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => {
     const data = await authService.login(username, password)
+    // Credentials accepted: discard any conversation left behind by a previous
+    // session before this user's data is loaded.
+    notifySessionCleared()
     localStorage.setItem(TOKEN_KEY, data.access_token)
     setToken(data.access_token)
     const me = await authService.getMe()
@@ -102,6 +112,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(TOKEN_KEY)
     setToken(null)
     setUser(null)
+    notifySessionCleared()
   }, [])
 
   const value = useMemo(
