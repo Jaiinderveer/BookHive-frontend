@@ -44,95 +44,43 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// Token refresh state management
-let isRefreshing = false
-let failedQueue = []
-
-const processQueue = (error, token = null) => {
-  failedQueue.forEach((prom) => {
-    if (error) prom.reject(error)
-    else prom.resolve(token)
-  })
-  failedQueue = []
-}
-
 // Centralized response handling:
 // - Pass through successful responses.
-// - On 401, attempt token refresh before dropping the session.
-// - On refresh failure, drop the stored session and notify the app.
+// - On a 401 that means the stored JWT is no longer usable, drop the session,
+//   notify the app, and reject the ORIGINAL error.
+//
+// There is deliberately no token refresh here. The backend exposes no refresh
+// endpoint — its /auth router is register, login, GET/PUT /me and
+// change-password — so the POST /auth/refresh this used to attempt could only
+// ever 404. That doomed round trip re-sent the stale token, and its 404 was then
+// rejected in place of the original 401, so an expired session told the user
+// "The requested resource was not found." instead of asking them to log in
+// again. Nothing is retried now, so no retry loop is possible either.
 apiClient.interceptors.response.use(
   (response) => response,
-  async (error) => {
-    const originalRequest = error.config
+  (error) => {
+    // Anything without a response (a network failure, or the missing-config
+    // error thrown above) has no status and must not end the session.
     const status = error.response?.status
-    const url = originalRequest?.url || ''
+    const url = error.config?.url || ''
 
-    // Only refresh the JWT when a protected request fails because
-    // the authentication token itself is invalid/expired.
-    //
-    // IMPORTANT:
-    // Do NOT refresh for endpoints where 401 can legitimately mean
-    // something other than an expired JWT, such as change-password.
-    const shouldRefresh =
+    // A 401 does not always mean the session ended:
+    // - /auth/login: the username or password is wrong.
+    // - /auth/change-password: the current password is wrong.
+    // Both must report their own failure and leave the session untouched.
+    const sessionExpired =
       status === 401 &&
-      !originalRequest?._retry &&
       !url.includes('/auth/login') &&
-      !url.includes('/auth/refresh') &&
       !url.includes('/auth/change-password')
 
-    if (!shouldRefresh) {
-      return Promise.reject(error)
-    }
-
-    if (isRefreshing) {
-      return new Promise((resolve, reject) => {
-        failedQueue.push({ resolve, reject })
-      })
-        .then((token) => {
-          originalRequest.headers.Authorization = `Bearer ${token}`
-          return apiClient(originalRequest)
-        })
-        .catch((err) => Promise.reject(err))
-    }
-
-    originalRequest._retry = true
-    isRefreshing = true
-
-    try {
-      const currentToken = localStorage.getItem(TOKEN_KEY)
-
-      const { data } = await apiClient.post(
-        '/auth/refresh',
-        {},
-        {
-          headers: {
-            Authorization: `Bearer ${currentToken}`,
-          },
-        }
-      )
-
-      const newToken = data.access_token
-
-      localStorage.setItem(TOKEN_KEY, newToken)
-
-      processQueue(null, newToken)
-
-      originalRequest.headers.Authorization = `Bearer ${newToken}`
-
-      return apiClient(originalRequest)
-    } catch (err) {
-      processQueue(err, null)
-
+    if (sessionExpired) {
       localStorage.removeItem(TOKEN_KEY)
-
-      window.dispatchEvent(
-        new CustomEvent('bookhive:unauthorized')
-      )
-
-      return Promise.reject(err)
-    } finally {
-      isRefreshing = false
+      window.dispatchEvent(new CustomEvent('bookhive:unauthorized'))
     }
+
+    // Reject the original error, so getErrorMessage() sees the 401 and produces
+    // the session-expired message.
+    return Promise.reject(error)
   }
 )
 // Convert any Axios error into a human-readable message.
