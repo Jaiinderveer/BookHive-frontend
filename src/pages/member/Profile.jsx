@@ -12,7 +12,7 @@ import Avatar from '@mui/material/Avatar'
 import Divider from '@mui/material/Divider'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { updateMe } from '../../services/authService.js'
-import { getErrorMessage } from '../../services/apiClient.js'
+import apiClient, { getErrorMessage } from '../../services/apiClient.js'
 import PageHeader from '../../components/ui/PageHeader.jsx'
 import { initials } from '../../utils/format.js'
 
@@ -103,22 +103,14 @@ export default function Profile() {
     }
     setChangingPassword(true)
     try {
-      const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
-      const response = await fetch(`${API_URL}/auth/change-password`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('bookhive_token')}`,
-        },
-        body: JSON.stringify({
-          current_password: passwordForm.currentPassword,
-          new_password: passwordForm.newPassword,
-        }),
+      // Go through the shared client so this page has no API URL or token key of
+      // its own: the base URL comes from apiClient's single configuration and the
+      // request interceptor attaches the JWT. getErrorMessage() already has a
+      // change-password branch, so the message shown on failure is unchanged.
+      await apiClient.post('/auth/change-password', {
+        current_password: passwordForm.currentPassword,
+        new_password: passwordForm.newPassword,
       })
-      if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.detail || 'Failed to change password')
-      }
       setSuccess('Password changed successfully.')
       setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err) {

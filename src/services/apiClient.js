@@ -2,7 +2,27 @@ import axios from 'axios'
 
 // Single Axios instance for the whole app.
 // Base URL comes from the environment (VITE_API_URL) — never hardcoded.
-const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000'
+//
+// Development may fall back to a local backend. A production build must not:
+// silently pointing a deployed app at localhost makes every request fail as an
+// apparent network/CORS problem, which hides the real cause (an unset variable).
+// So in production a missing VITE_API_URL leaves the base URL empty and every
+// request fails immediately with the message below, which names what to set.
+const API_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
+
+const MISSING_API_URL_MESSAGE =
+  'VITE_API_URL is not set. Set it in the deployment environment and rebuild; ' +
+  'only development falls back to a local backend.'
+
+if (!API_URL) {
+  // Reported once at load so the cause is visible before anything is clicked.
+  // The throw itself lives in the request interceptor rather than here: a
+  // top-level throw is provably unconditional, so the bundler drops this
+  // module's remaining statements and exports and the build fails with an
+  // unrelated "missing export" error instead.
+  console.error(`BookHive configuration error: ${MISSING_API_URL_MESSAGE}`)
+}
+
 const TOKEN_KEY = 'bookhive_token'
 
 const apiClient = axios.create({
@@ -12,6 +32,11 @@ const apiClient = axios.create({
 
 // Attach the JWT to every outgoing request when present.
 apiClient.interceptors.request.use((config) => {
+  // With no configured base URL, requests would go to whatever origin is
+  // serving the app. Fail loudly instead of sending them somewhere wrong.
+  if (!API_URL) {
+    throw new Error(MISSING_API_URL_MESSAGE)
+  }
   const token = localStorage.getItem(TOKEN_KEY)
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
