@@ -1,7 +1,38 @@
-/* BookHive E2E smoke test — run with: node e2e-smoke.mjs */
+/* BookHive E2E smoke test.
+ *
+ * Run with the librarian credentials supplied by the environment:
+ *
+ *   E2E_LIBRARIAN_USERNAME=... E2E_LIBRARIAN_PASSWORD=... node e2e-smoke.mjs
+ *
+ * or keep them in a git-ignored env file and let Node load it:
+ *
+ *   node --env-file=.env e2e-smoke.mjs
+ *
+ * No credential is stored in this file. There is deliberately no fallback
+ * account, and no credential value is ever printed by this script.
+ */
+import { randomBytes } from 'node:crypto'
 import { chromium } from 'playwright-core'
 
 const BASE = 'http://localhost:5173'
+
+const LIBRARIAN_USERNAME = process.env.E2E_LIBRARIAN_USERNAME
+const LIBRARIAN_PASSWORD = process.env.E2E_LIBRARIAN_PASSWORD
+
+if (!LIBRARIAN_USERNAME || !LIBRARIAN_PASSWORD) {
+  // Report the missing variable NAMES only.
+  const missing = [
+    !LIBRARIAN_USERNAME && 'E2E_LIBRARIAN_USERNAME',
+    !LIBRARIAN_PASSWORD && 'E2E_LIBRARIAN_PASSWORD',
+  ].filter(Boolean)
+  console.error(
+    `E2E credentials are not configured. Missing: ${missing.join(', ')}\n` +
+      'See .env.example for the variable names. Keep the values out of the\n' +
+      'repository - .gitignore already excludes .env and .env.* files.'
+  )
+  process.exit(1)
+}
+
 const results = []
 const log = (ok, msg) => {
   results.push({ ok, msg })
@@ -44,7 +75,10 @@ const browser = await chromium.launch({
   // 2. Register a member via UI
   const ts = Date.now().toString(36)
   const memberUser = `e2e_member_${ts}`
-  const memberPass = 'E2eMemberPass123!'
+  // Generated per run so no password literal lives in the repository. The shape
+  // keeps the upper/lower/digit/symbol mix the registration form expects, and
+  // the account it creates is disposable.
+  const memberPass = `E2e${randomBytes(12).toString('base64url')}9!`
   await page.goto(BASE + '/login')
   await page.click('button:has-text("Create account")')
   await page.fill('input[name="username"]', memberUser)
@@ -103,7 +137,7 @@ const browser = await chromium.launch({
 {
   const { context, page, errors } = await newPage(browser)
 
-  await login(page, 'e2e_librarian', 'E2eLibPass123!')
+  await login(page, LIBRARIAN_USERNAME, LIBRARIAN_PASSWORD)
 
   // Dashboard
   await page.waitForSelector('text=BookHive Insights', { timeout: 15000 })
@@ -157,7 +191,7 @@ const browser = await chromium.launch({
 // ---------- MOBILE VIEWPORT QUICK CHECK ----------
 {
   const { context, page, errors } = await newPage(browser, { width: 390, height: 844 })
-  await login(page, 'e2e_librarian', 'E2eLibPass123!')
+  await login(page, LIBRARIAN_USERNAME, LIBRARIAN_PASSWORD)
   await page.waitForSelector('text=BookHive Insights', { timeout: 15000 })
   const scrollW = await page.evaluate(() => document.documentElement.scrollWidth)
   const clientW = await page.evaluate(() => document.documentElement.clientWidth)
