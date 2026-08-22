@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
+import Typography from '@mui/material/Typography'
 import { useAuth } from '../context/AuthContext.jsx'
 import ProtectedRoute from './ProtectedRoute.jsx'
 import RoleRoute from './RoleRoute.jsx'
@@ -27,8 +28,20 @@ function RootRedirect() {
 
 function PageFallback() {
   return (
-    <Box sx={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <CircularProgress />
+    <Box
+      sx={{
+        minHeight: '60vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 1.75,
+      }}
+    >
+      <CircularProgress size={26} thickness={4.5} />
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+        Loading…
+      </Typography>
     </Box>
   )
 }

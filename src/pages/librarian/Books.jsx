@@ -4,11 +4,9 @@ import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
-import Avatar from '@mui/material/Avatar'
-import Card from '@mui/material/Card'
-import CardContent from '@mui/material/CardContent'
 import Snackbar from '@mui/material/Snackbar'
 import Alert from '@mui/material/Alert'
 
@@ -16,23 +14,38 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
-import FilterListIcon from '@mui/icons-material/FilterList'
-import ClearIcon from '@mui/icons-material/Clear'
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
-import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline'
+import LibraryBooksOutlinedIcon from '@mui/icons-material/LibraryBooksOutlined'
 
 import { getBooks, deleteBook } from '../../services/bookService.js'
 import { useAsync } from '../../hooks/useAsync.js'
 import { getErrorMessage } from '../../services/apiClient.js'
 import PageHeader from '../../components/ui/PageHeader.jsx'
 import ResponsiveTable from '../../components/ui/ResponsiveTable.jsx'
-import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateViews.jsx'
+import FilterBar from '../../components/ui/FilterBar.jsx'
+import EntityCell from '../../components/ui/EntityCell.jsx'
+import { LoadingState, EmptyState, ErrorState, TableLoadingState } from '../../components/ui/StateViews.jsx'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx'
 import BookFormDialog from './BookFormDialog.jsx'
 
+const EMPTY_FILTERS = { title: '', author: '', category: '', isbn: '' }
+
+// Availability reads as one chip everywhere: table, mobile card and dialogs.
+function AvailabilityChip({ book }) {
+  const available = book.available_quantity > 0
+  const partial = available && book.available_quantity < book.quantity
+  return (
+    <Chip
+      size="small"
+      color={available ? (partial ? 'warning' : 'success') : 'error'}
+      label={available ? `${book.available_quantity} of ${book.quantity} in` : 'All copies out'}
+    />
+  )
+}
+
 export default function Books() {
-  const [filters, setFilters] = useState({ title: '', author: '', category: '', isbn: '' })
-  const [searchInput, setSearchInput] = useState({ title: '', author: '', category: '', isbn: '' })
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [searchInput, setSearchInput] = useState(EMPTY_FILTERS)
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
@@ -42,7 +55,8 @@ export default function Books() {
   const loader = useCallback(() => getBooks(filters), [filters])
   const { data: books, loading, error, reload } = useAsync(loader)
 
-  const hasActiveFilters = Boolean(filters.title || filters.author || filters.category || filters.isbn)
+  const activeFilterCount = Object.values(filters).filter(Boolean).length
+  const hasActiveFilters = activeFilterCount > 0
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -50,8 +64,8 @@ export default function Books() {
   }
 
   const handleClearFilters = () => {
-    setSearchInput({ title: '', author: '', category: '', isbn: '' })
-    setFilters({ title: '', author: '', category: '', isbn: '' })
+    setSearchInput(EMPTY_FILTERS)
+    setFilters(EMPTY_FILTERS)
   }
 
   const handleDelete = async () => {
@@ -77,149 +91,242 @@ export default function Books() {
     reload()
   }
 
+  const openEdit = (book) => {
+    setEditing(book)
+    setFormOpen(true)
+  }
+
+  const rowActions = (book) => (
+    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+      <Tooltip title="Edit book">
+        <IconButton size="small" onClick={() => openEdit(book)} aria-label="Edit book" sx={{ color: 'text.secondary' }}>
+          <EditOutlinedIcon sx={{ fontSize: 17 }} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete book">
+        <IconButton size="small" color="error" onClick={() => setDeleting(book)} aria-label="Delete book">
+          <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  )
+
   const columns = [
-    { id: 'title', label: 'Title', render: (b) => <Typography fontWeight={600} variant='body1'>{b.title}</Typography> },
-    { id: 'author', label: 'Author', render: (b) => <Typography color='text.secondary'>{b.author}</Typography> },
-    { id: 'isbn', label: 'ISBN', render: (b) => <Typography variant='body2' fontFamily='monospace' fontSize='0.8125rem'>{b.isbn}</Typography> },
-    { id: 'category', label: 'Category', render: (b) => <Chip size='small' label={b.category} color='default' variant='outlined' /> },
-    { id: 'availability', label: 'Availability', render: (b) => {
-        const available = b.available_quantity > 0
-        return (
-          <Chip
-            size='small'
-            color={available ? 'success' : 'error'}
-            variant='outlined'
-            label={available ? b.available_quantity + ' available' : 'Out of stock'}
-            icon={available ? <CheckCircleOutlineIcon fontSize='small' /> : undefined}
-          />
-        )
-      }
+    {
+      id: 'title',
+      label: 'Book',
+      minWidth: 260,
+      render: (b) => (
+        <EntityCell icon={MenuBookOutlinedIcon} title={b.title} subtitle={b.author} color="primary" />
+      ),
     },
-    { id: 'total', label: 'Total', render: (b) => <Typography variant='body2' color='text.secondary'>{b.quantity} copies</Typography> },
-    { id: 'actions', label: '', align: 'right', render: (b) => (
-        <Stack direction='row' spacing={1} justifyContent='flex-end'>
-          <IconButton size='small' onClick={() => { setEditing(b); setFormOpen(true); }} aria-label='Edit book'>
-            <EditOutlinedIcon fontSize='small' />
-          </IconButton>
-          <IconButton size='small' color='error' onClick={() => setDeleting(b)} aria-label='Delete book'>
-            <DeleteOutlineIcon fontSize='small' />
-          </IconButton>
-        </Stack>
-      )
+    {
+      id: 'isbn',
+      label: 'ISBN',
+      render: (b) => (
+        <Typography
+          variant="body2"
+          sx={{ fontFamily: (t) => t.typography.fontFamilyMonospace, fontSize: '0.8125rem', color: 'text.secondary' }}
+        >
+          {b.isbn}
+        </Typography>
+      ),
     },
+    {
+      id: 'category',
+      label: 'Category',
+      render: (b) => (b.category ? <Chip size="small" label={b.category} variant="outlined" /> : '—'),
+    },
+    {
+      id: 'published',
+      label: 'Published',
+      render: (b) => (
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {b.publisher || '—'}
+          {b.publication_year ? ` · ${b.publication_year}` : ''}
+        </Typography>
+      ),
+    },
+    { id: 'availability', label: 'Availability', render: (b) => <AvailabilityChip book={b} /> },
+    { id: 'actions', label: '', align: 'right', width: 96, render: rowActions },
   ]
 
-  const renderCard = (b) => {
-    const available = b.available_quantity > 0
-    return (
-      <Card sx={{ height: '100%', transition: 'transform 0.2s ease, box-shadow 0.2s ease', '&:hover': { transform: 'translateY(-2px)' } }}>
-        <CardContent sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <Avatar
-              sx={{ width: 48, height: 48, bgcolor: 'primary.light', color: 'primary.dark', flexShrink: 0 }}
-            >
-              <MenuBookOutlinedIcon fontSize='medium' />
-            </Avatar>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant='h6' fontWeight={700} gutterBottom lineHeight={1.3}>
-                {b.title}
-              </Typography>
-              <Typography variant='body2' color='text.secondary' gutterBottom>
-                {b.author}
-              </Typography>
-              <Stack direction='row' spacing={1} flexWrap='wrap' mt={1}>
-                <Chip size='small' label={b.category} color='default' variant='outlined' />
-                <Chip
-                  size='small'
-                  color={available ? 'success' : 'error'}
-                  variant='outlined'
-                  label={available ? b.available_quantity + ' available' : 'Out of stock'}
-                  icon={available ? <CheckCircleOutlineIcon fontSize='small' /> : undefined}
-                />
-                <Chip size='small' variant='outlined' label={b.quantity + ' copies'} />
-              </Stack>
-              {(b.publisher || b.publication_year) && (
-                <Typography variant='caption' color='text.secondary' sx={{ display: 'block', mt: 1.5 }}>
-                  {b.publisher}
-                  {b.publication_year && <span> ({b.publication_year})</span>}
-                </Typography>
-              )}
-            </Box>
-            <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-              <IconButton size='small' onClick={() => { setEditing(b); setFormOpen(true); }} aria-label='Edit book'>
-                <EditOutlinedIcon fontSize='small' />
-              </IconButton>
-              <IconButton size='small' color='error' onClick={() => setDeleting(b)} aria-label='Delete book'>
-                <DeleteOutlineIcon fontSize='small' />
-              </IconButton>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
-    )
-  }
+  const renderCard = (b) => (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <EntityCell
+            icon={MenuBookOutlinedIcon}
+            size={40}
+            title={b.title}
+            subtitle={b.author}
+            color="primary"
+            titleProps={{ fontSize: '0.9375rem' }}
+          />
+        </Box>
+        <Box sx={{ flexShrink: 0 }}>{rowActions(b)}</Box>
+      </Box>
+      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 1.5 }}>
+        <AvailabilityChip book={b} />
+        {b.category && <Chip size="small" label={b.category} variant="outlined" />}
+        {b.isbn && <Chip size="small" variant="outlined" label={b.isbn} />}
+      </Stack>
+      {(b.publisher || b.publication_year) && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.25 }}>
+          {b.publisher}
+          {b.publication_year ? ` (${b.publication_year})` : ''}
+        </Typography>
+      )}
+    </Box>
+  )
 
   return (
     <Box>
       <PageHeader
-        title='Books'
-        subtitle='Manage your library catalog'
-        actions={<Button variant='contained' startIcon={<AddIcon />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add Book</Button>}
+        title="Books"
+        subtitle="Search, edit and keep the catalogue accurate."
+        icon={LibraryBooksOutlinedIcon}
+        meta={
+          books && !loading && !error ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${books.length} ${books.length === 1 ? 'title' : 'titles'}${hasActiveFilters ? ' matching' : ''}`}
+            />
+          ) : null
+        }
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+            onClick={() => {
+              setEditing(null)
+              setFormOpen(true)
+            }}
+          >
+            Add book
+          </Button>
+        }
       />
 
-      {/* Search & Filter Bar */}
-      <Card sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant='h6' component='h2' sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterListIcon color='primary' sx={{ fontSize: 22 }} />
-            Search & Filter
-          </Typography>
-          {hasActiveFilters && (
-            <Button variant='text' startIcon={<ClearIcon />} size='small' onClick={handleClearFilters} color='secondary'>
-              Clear all filters
-            </Button>
-          )}
-        </Box>
-        <Box component='form' onSubmit={handleSearch}>
-          <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
-            <TextField label='Title' size='small' value={searchInput.title} onChange={(e) => setSearchInput((f) => ({ ...f, title: e.target.value }))} fullWidth />
-            <TextField label='Author' size='small' value={searchInput.author} onChange={(e) => setSearchInput((f) => ({ ...f, author: e.target.value }))} fullWidth />
-            <TextField label='Category' size='small' value={searchInput.category} onChange={(e) => setSearchInput((f) => ({ ...f, category: e.target.value }))} fullWidth />
-            <TextField label='ISBN' size='small' value={searchInput.isbn} onChange={(e) => setSearchInput((f) => ({ ...f, isbn: e.target.value }))} fullWidth />
-            <Button type='submit' variant='contained' startIcon={<SearchIcon />} sx={{ alignSelf: 'stretch', minWidth: 120 }}>
+      <Box component="form" onSubmit={handleSearch}>
+        <FilterBar
+          title="Search catalogue"
+          activeCount={activeFilterCount}
+          onClear={handleClearFilters}
+          actions={
+            <Button type="submit" size="small" variant="contained" startIcon={<SearchIcon sx={{ fontSize: 16 }} />}>
               Search
             </Button>
-          </Stack>
-        </Box>
-      </Card>
+          }
+        >
+          <TextField
+            label="Title"
+            value={searchInput.title}
+            onChange={(e) => setSearchInput((f) => ({ ...f, title: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label="Author"
+            value={searchInput.author}
+            onChange={(e) => setSearchInput((f) => ({ ...f, author: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label="Category"
+            value={searchInput.category}
+            onChange={(e) => setSearchInput((f) => ({ ...f, category: e.target.value }))}
+            fullWidth
+          />
+          <TextField
+            label="ISBN"
+            value={searchInput.isbn}
+            onChange={(e) => setSearchInput((f) => ({ ...f, isbn: e.target.value }))}
+            fullWidth
+          />
+        </FilterBar>
+      </Box>
 
       {loading ? (
-        <LoadingState label='Loading books...' />
+        books ? (
+          <TableLoadingState rows={6} columns={5} />
+        ) : (
+          <LoadingState label="Loading books…" />
+        )
       ) : error ? (
         <ErrorState message={getErrorMessage(error)} onRetry={reload} />
       ) : books && books.length === 0 ? (
         <EmptyState
-          title='No books found'
-          description={filters.title || filters.author || filters.category || filters.isbn ? 'Try adjusting your search.' : 'Add your first book to get started.'}
+          title="No books found"
+          description={
+            hasActiveFilters
+              ? 'No titles match these filters. Try a broader search or clear the filters.'
+              : 'Add your first book to start building the catalogue.'
+          }
+          icon={LibraryBooksOutlinedIcon}
+          action={
+            hasActiveFilters ? (
+              <Button variant="outlined" onClick={handleClearFilters}>
+                Clear filters
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+                onClick={() => {
+                  setEditing(null)
+                  setFormOpen(true)
+                }}
+              >
+                Add book
+              </Button>
+            )
+          }
         />
       ) : (
-        <ResponsiveTable columns={columns} rows={books || []} getRowKey={(b) => b.id} renderCard={renderCard} />
+        <ResponsiveTable
+          columns={columns}
+          rows={books || []}
+          getRowKey={(b) => b.id}
+          renderCard={renderCard}
+          footer={`${books?.length || 0} ${books?.length === 1 ? 'title' : 'titles'} shown`}
+        />
       )}
 
-      {formOpen && <BookFormDialog book={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={handleSaved} />}
+      {formOpen && (
+        <BookFormDialog
+          book={editing}
+          onClose={() => {
+            setFormOpen(false)
+            setEditing(null)
+          }}
+          onSaved={handleSaved}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleting)}
-        title='Delete book?'
-        message={deleting ? 'Are you sure you want to delete ' + deleting.title + '? This cannot be undone.' : ''}
-        confirmLabel='Delete'
+        title="Delete this book?"
+        message={
+          deleting
+            ? `“${deleting.title}” will be removed from the catalogue. This cannot be undone.`
+            : ''
+        }
+        confirmLabel="Delete book"
         onConfirm={handleDelete}
         onCancel={() => setDeleting(null)}
         loading={deleteLoading}
       />
 
-      <Snackbar open={Boolean(snack)} autoHideDuration={4000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={() => setSnack(null)} severity={snack?.severity || 'info'} sx={{ width: '100%' }}>{snack?.message}</Alert>
+      <Snackbar
+        open={Boolean(snack)}
+        autoHideDuration={4000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnack(null)} severity={snack?.severity || 'info'} variant="standard" sx={{ width: '100%' }}>
+          {snack?.message}
+        </Alert>
       </Snackbar>
     </Box>
   )

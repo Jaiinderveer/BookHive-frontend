@@ -10,13 +10,15 @@ import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
 import Avatar from '@mui/material/Avatar'
 import Chip from '@mui/material/Chip'
-import Divider from '@mui/material/Divider'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
 import AutoAwesomeOutlinedIcon from '@mui/icons-material/AutoAwesomeOutlined'
 import SendIcon from '@mui/icons-material/Send'
 import DeleteSweepOutlinedIcon from '@mui/icons-material/DeleteSweepOutlined'
+import PersonOutlineIcon from '@mui/icons-material/PersonOutline'
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward'
+import RefreshIcon from '@mui/icons-material/Refresh'
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined'
 import GroupOutlinedIcon from '@mui/icons-material/GroupOutlined'
@@ -825,11 +827,20 @@ export default function AIAssistant() {
     >
       <PageHeader
         title="AI Assistant"
-        subtitle="Your BookHive librarian copilot"
+        subtitle="Ask in plain language — BookHive answers from live library data."
+        icon={AutoAwesomeOutlinedIcon}
+        meta={
+          <Chip
+            size="small"
+            variant="outlined"
+            label={sending ? 'Working on your request…' : 'Connected to live library data'}
+          />
+        }
         actions={
           messages.length > 0 ? (
             <Button
-              startIcon={<DeleteSweepOutlinedIcon />}
+              variant="outlined"
+              startIcon={<DeleteSweepOutlinedIcon sx={{ fontSize: 18 }} />}
               onClick={clearChat}
               disabled={sending}
             >
@@ -846,77 +857,188 @@ export default function AIAssistant() {
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
-          borderRadius: 3,
         }}
       >
+        {/*
+          Product chrome: a persistent identity and status strip so the panel
+          reads as a tool inside BookHive rather than an anonymous chat box.
+        */}
+        <Box
+          sx={{
+            px: { xs: 1.75, md: 2.25 },
+            py: 1.25,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1.5,
+            borderBottom: '1px solid',
+            borderColor: 'divider',
+            flexShrink: 0,
+          }}
+        >
+          <Avatar
+            variant="rounded"
+            sx={{
+              width: 32,
+              height: 32,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+            }}
+          >
+            <AutoAwesomeOutlinedIcon sx={{ fontSize: 18 }} />
+          </Avatar>
+
+          <Box sx={{ minWidth: 0 }}>
+            <Typography variant="subtitle2" sx={{ lineHeight: 1.3 }}>
+              BookHive Assistant
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+              {sending
+                ? 'Thinking…'
+                : messages.length > 0
+                  ? `${messages.length} message${messages.length === 1 ? '' : 's'} in this conversation`
+                  : 'Ready when you are'}
+            </Typography>
+          </Box>
+
+          <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.75 }}>
+            <Box
+              sx={{
+                width: 7,
+                height: 7,
+                borderRadius: '50%',
+                bgcolor: sending ? 'warning.main' : 'success.main',
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{ color: 'text.secondary', display: { xs: 'none', sm: 'block' } }}
+            >
+              {sending ? 'Running' : 'Live'}
+            </Typography>
+          </Box>
+        </Box>
+
         <Box
           sx={{
             flexGrow: 1,
             minHeight: 0,
             overflowY: 'auto',
-            p: { xs: 1.5, md: 2.5 },
+            px: { xs: 1.5, md: 2.5 },
+            py: { xs: 2, md: 2.5 },
+            bgcolor: 'background.sunken',
           }}
         >
           {messages.length === 0 ? (
             <Box
               sx={{
-                py: 5,
-                px: 2,
-                textAlign: 'center',
+                maxWidth: 720,
+                mx: 'auto',
+                py: { xs: 2, md: 4 },
+                px: { xs: 0, sm: 1 },
               }}
             >
-              <Avatar
-                sx={{
-                  mx: 'auto',
-                  mb: 2,
-                  bgcolor: 'primary.main',
-                  width: 52,
-                  height: 52,
-                }}
-              >
-                <AutoAwesomeOutlinedIcon />
-              </Avatar>
+              <Box sx={{ textAlign: 'center' }}>
+                <Avatar
+                  variant="rounded"
+                  sx={{
+                    mx: 'auto',
+                    mb: 2,
+                    width: 48,
+                    height: 48,
+                    borderRadius: 2,
+                    bgcolor: 'primary.main',
+                    color: 'primary.contrastText',
+                  }}
+                >
+                  <AutoAwesomeOutlinedIcon />
+                </Avatar>
 
-              <Typography variant="h6" gutterBottom>
-                How can I help manage the library?
-              </Typography>
+                <Typography variant="h5" sx={{ mb: 1 }}>
+                  How can I help manage the library?
+                </Typography>
+
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ maxWidth: 480, mx: 'auto' }}
+                >
+                  Ask about the catalogue, members, transactions or the dashboard. The
+                  assistant reads live data and can carry out library operations for you.
+                </Typography>
+              </Box>
 
               <Typography
-                variant="body2"
-                color="text.secondary"
-                sx={{
-                  mb: 3,
-                  maxWidth: 520,
-                  mx: 'auto',
-                }}
+                variant="overline"
+                sx={{ display: 'block', mt: 4, mb: 1.25, color: 'text.disabled' }}
               >
-                Ask about your catalog, members, transactions and dashboard.
-                BookHive AI can run library operations for you using live data.
+                Try one of these
               </Typography>
 
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={1.5}
-                justifyContent="center"
-                mx={1}
-                mb={2}
+              <Box
+                sx={{
+                  display: 'grid',
+                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
+                  gap: 1.25,
+                }}
               >
                 {EXAMPLES.map((ex) => (
-                  <Button
+                  <Box
                     key={ex}
-                    variant="outlined"
-                    size="small"
-                    onClick={() => handleSend(ex)}
-                    disabled={sending}
+                    role="button"
+                    tabIndex={sending ? -1 : 0}
+                    aria-disabled={sending}
+                    onClick={() => {
+                      if (!sending) handleSend(ex)
+                    }}
+                    onKeyDown={(e) => {
+                      if (sending) return
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault()
+                        handleSend(ex)
+                      }
+                    }}
                     sx={{
-                      maxWidth: { sm: 280 },
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1.25,
+                      px: 1.75,
+                      py: 1.5,
+                      textAlign: 'left',
+                      cursor: sending ? 'default' : 'pointer',
+                      opacity: sending ? 0.55 : 1,
                       borderRadius: 2,
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      bgcolor: 'background.paper',
+                      transition: 'border-color 180ms cubic-bezier(0.32, 0.72, 0, 1), background-color 180ms cubic-bezier(0.32, 0.72, 0, 1), transform 180ms cubic-bezier(0.32, 0.72, 0, 1)',
+                      '&:hover': sending
+                        ? undefined
+                        : {
+                            borderColor: 'primary.main',
+                            transform: 'translateY(-1px)',
+                            '& .prompt-arrow': { opacity: 1, transform: 'translateX(0)' },
+                          },
+                      '&:focus-visible': { borderColor: 'primary.main' },
                     }}
                   >
-                    {ex}
-                  </Button>
+                    <AutoAwesomeOutlinedIcon sx={{ fontSize: 16, color: 'primary.main', flexShrink: 0 }} />
+                    <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0 }}>
+                      {ex}
+                    </Typography>
+                    <ArrowForwardIcon
+                      className="prompt-arrow"
+                      sx={{
+                        fontSize: 15,
+                        color: 'primary.main',
+                        flexShrink: 0,
+                        opacity: 0,
+                        transform: 'translateX(-4px)',
+                        transition: 'opacity 180ms ease, transform 180ms ease',
+                      }}
+                    />
+                  </Box>
                 ))}
-              </Stack>
+              </Box>
             </Box>
           ) : (
             <Stack spacing={2}>
@@ -980,22 +1102,23 @@ export default function AIAssistant() {
                   >
                     {/* Avatar */}
                     <Avatar
+                      variant="rounded"
                       sx={{
-                        width: 36,
-                        height: 36,
+                        width: 30,
+                        height: 30,
+                        mt: 0.25,
                         flexShrink: 0,
-                        bgcolor: isUser
-                          ? 'primary.main'
-                          : 'primary.light',
-                        color: isUser
-                          ? 'primary.contrastText'
-                          : 'primary.dark',
+                        borderRadius: 1.75,
+                        bgcolor: isUser ? 'background.paper' : 'primary.main',
+                        color: isUser ? 'text.secondary' : 'primary.contrastText',
+                        border: isUser ? '1px solid' : 'none',
+                        borderColor: 'divider',
                       }}
                     >
                       {isUser ? (
-                        'U'
+                        <PersonOutlineIcon sx={{ fontSize: 16 }} />
                       ) : (
-                        <AutoAwesomeOutlinedIcon fontSize="small" />
+                        <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
                       )}
                     </Avatar>
 
@@ -1022,10 +1145,9 @@ export default function AIAssistant() {
                           sx={{
                             backgroundColor: 'primary.main',
                             color: 'primary.contrastText',
-                            px: 2,
-                            py: 1.2,
-                            borderRadius: '18px 18px 4px 18px',
-                            boxShadow: 2,
+                            px: 1.75,
+                            py: 1.15,
+                            borderRadius: '12px 12px 4px 12px',
                             wordBreak: 'break-word',
                           }}
                         >
@@ -1033,7 +1155,7 @@ export default function AIAssistant() {
                             variant="body2"
                             sx={{
                               whiteSpace: 'pre-wrap',
-                              lineHeight: 1.5,
+                              lineHeight: 1.55,
                             }}
                           >
                             {msg.content}
@@ -1089,12 +1211,12 @@ export default function AIAssistant() {
                                   backgroundColor: 'background.paper',
                                   border: '1px solid',
                                   borderColor: 'divider',
-                                  borderRadius: '4px 18px 18px 18px',
-                                  px: 2,
-                                  py: 1.5,
-                                  boxShadow: 1,
+                                  borderRadius: '4px 12px 12px 12px',
+                                  px: 1.875,
+                                  py: 1.375,
                                   width: 'fit-content',
                                   maxWidth: '100%',
+                                  mt: structuredResults.length > 0 ? 1.5 : 0,
                                 }}
                               >
                                 <MarkdownMessage content={filtered} />
@@ -1111,33 +1233,25 @@ export default function AIAssistant() {
                           and the error was therefore never shown at all.
                         */}
                       {msg.id === failedId && error && (
-                        <Box
-                          sx={{
-                            mt: 1,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1,
-                            width: '100%',
-                          }}
-                        >
+                        <Box sx={{ mt: 1.25, width: '100%' }}>
                           <Alert
                             severity="error"
-                            sx={{
-                              flex: 1,
-                              borderRadius: 2,
-                            }}
+                            action={
+                              <Button
+                                size="small"
+                                color="error"
+                                variant="outlined"
+                                startIcon={<RefreshIcon sx={{ fontSize: 15 }} />}
+                                onClick={handleRetry}
+                                disabled={sending}
+                              >
+                                Retry
+                              </Button>
+                            }
+                            sx={{ alignItems: 'center' }}
                           >
                             {error}
                           </Alert>
-
-                          <Button
-                            size="small"
-                            color="primary"
-                            onClick={handleRetry}
-                            disabled={sending}
-                          >
-                            Retry
-                          </Button>
                         </Box>
                       )}
                     </Box>
@@ -1150,33 +1264,97 @@ export default function AIAssistant() {
           )}
 
           {isLoading && (
-            <Box sx={{ py: 2, textAlign: 'center' }}>
-              <CircularProgress size={24} />
+            <Box
+              sx={{
+                mt: messages.length > 0 ? 1 : 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <Avatar
+                variant="rounded"
+                sx={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 1.75,
+                  flexShrink: 0,
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                }}
+              >
+                <AutoAwesomeOutlinedIcon sx={{ fontSize: 16 }} />
+              </Avatar>
+
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.25,
+                  px: 1.75,
+                  py: 1.25,
+                  borderRadius: '4px 12px 12px 12px',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  bgcolor: 'background.paper',
+                }}
+              >
+                <Box
+                  sx={{
+                    display: 'flex',
+                    gap: 0.5,
+                    '@keyframes bookhive-typing': {
+                      '0%, 60%, 100%': { opacity: 0.25, transform: 'translateY(0)' },
+                      '30%': { opacity: 1, transform: 'translateY(-2px)' },
+                    },
+                  }}
+                >
+                  {[0, 1, 2].map((dot) => (
+                    <Box
+                      key={dot}
+                      sx={{
+                        width: 5,
+                        height: 5,
+                        borderRadius: '50%',
+                        bgcolor: 'primary.main',
+                        animation: 'bookhive-typing 1.2s ease-in-out infinite',
+                        animationDelay: `${dot * 0.15}s`,
+                      }}
+                    />
+                  ))}
+                </Box>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                  Checking library data…
+                </Typography>
+              </Box>
             </Box>
           )}
         </Box>
 
-        <Divider />
-
         <Box
           sx={{
-            p: { xs: 1.5, md: 2 },
-            bgcolor: 'background.default',
+            px: { xs: 1.5, md: 2 },
+            pt: { xs: 1.5, md: 1.75 },
+            pb: { xs: 1.25, md: 1.5 },
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            bgcolor: 'background.paper',
+            flexShrink: 0,
           }}
         >
           <Box
             sx={{
               display: 'flex',
               alignItems: 'flex-end',
-              gap: 1.5,
+              gap: 1.25,
             }}
           >
             <TextField
               fullWidth
               multiline
               rows={1}
-              maxRows={4}
-              placeholder="Ask about books, members, transactions..."
+              maxRows={5}
+              placeholder="Ask about books, members, transactions…"
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
@@ -1184,33 +1362,37 @@ export default function AIAssistant() {
               sx={{
                 flexGrow: 1,
                 minWidth: 0,
-                '& .MuiInputBase-root': {
-                  borderRadius: 3,
-                },
               }}
             />
 
             <Button
               variant="contained"
-              size="large"
               onClick={() => handleSend()}
               disabled={!input.trim() || sending}
+              aria-label="Send message"
               startIcon={
                 sending ? (
-                  <CircularProgress size={20} color="inherit" />
+                  <CircularProgress size={16} color="inherit" />
                 ) : (
-                  <SendIcon />
+                  <SendIcon sx={{ fontSize: 17 }} />
                 )
               }
               sx={{
-                px: 3,
+                px: { xs: 2, sm: 2.5 },
+                height: 40,
                 whiteSpace: 'nowrap',
-                borderRadius: 3,
               }}
             >
-              {sending ? 'Sending...' : 'Send'}
+              {sending ? 'Sending' : 'Send'}
             </Button>
           </Box>
+
+          <Typography
+            variant="caption"
+            sx={{ display: 'block', mt: 1, color: 'text.disabled' }}
+          >
+            Enter to send · Shift + Enter for a new line · answers come from your live library data
+          </Typography>
         </Box>
       </Card>
     </Box>
@@ -1246,7 +1428,7 @@ function ToolResultCard({
         <Card
           variant="outlined"
           sx={{
-            borderRadius: 3,
+            borderRadius: 2,
             overflow: 'hidden',
           }}
         >
@@ -1283,7 +1465,7 @@ function ToolResultCard({
                     key={`${formatValue(item.title)}-${idx}`}
                     variant="outlined"
                     sx={{
-                      borderRadius: 2.5,
+                      borderRadius: 2,
                       borderColor: 'divider',
                     }}
                   >
@@ -1432,7 +1614,7 @@ function ToolResultCard({
 
             <Stack spacing={1.5}>
               {data.map((item, idx) => (
-                <Card key={idx} variant="outlined" sx={{ borderRadius: 2.5, border: '1px solid', borderColor: 'divider' }}>
+                <Card key={idx} variant="outlined" sx={{ borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
                   <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                     <Stack direction="row" spacing={1.5}>
                       <Avatar sx={{ bgcolor: 'primary.light', color: 'primary.dark', width: 44, height: 44 }}>
@@ -1779,7 +1961,7 @@ function StatCardSimple({ label, value, color, icon }) {
       variant="outlined"
       sx={{
         height: '100%',
-        borderRadius: 2.5,
+        borderRadius: 2,
       }}
     >
       <CardContent

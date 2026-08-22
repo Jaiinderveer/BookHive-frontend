@@ -31,11 +31,12 @@ export default function DashboardLayout() {
         <Topbar onMenuClick={() => setMobileOpen(true)} user={user} onLogout={logout} />
         <Box
           sx={{
-            p: { xs: 2, sm: 2.5, md: 3, lg: 4 },
+            px: { xs: 2, sm: 2.5, md: 3.5, lg: 4 },
+            py: { xs: 2.5, sm: 3, md: 3.5, lg: 4 },
             flexGrow: 1,
             minWidth: 0,
             width: '100%',
-            maxWidth: { xl: '1440px' },
+            maxWidth: { xl: '1560px' },
             mx: 'auto',
           }}
         >

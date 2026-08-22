@@ -4,19 +4,21 @@ import Button from '@mui/material/Button'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Grid from '@mui/material/Grid'
-import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
+import InputAdornment from '@mui/material/InputAdornment'
+
 import SearchIcon from '@mui/icons-material/Search'
-import FilterListIcon from '@mui/icons-material/FilterList'
-import ClearIcon from '@mui/icons-material/Clear'
 import MenuBookOutlinedIcon from '@mui/icons-material/MenuBookOutlined'
+import LibraryBooksOutlinedIcon from '@mui/icons-material/LibraryBooksOutlined'
+
 import { getBooks } from '../../services/bookService.js'
 import { useAsync } from '../../hooks/useAsync.js'
 import { getErrorMessage } from '../../services/apiClient.js'
 import PageHeader from '../../components/ui/PageHeader.jsx'
-import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateViews.jsx'
+import FilterBar from '../../components/ui/FilterBar.jsx'
+import { EmptyState, ErrorState, CardGridLoadingState } from '../../components/ui/StateViews.jsx'
 
 export default function BrowseBooks() {
   const [filters, setFilters] = useState({ search: '' })
@@ -41,87 +43,143 @@ export default function BrowseBooks() {
     setQuery('')
   }
 
+  const availableCount = (books || []).filter((b) => b.available_quantity > 0).length
+
   return (
     <Box>
-      <PageHeader title="Browse Books" subtitle="Explore the library catalog" />
+      <PageHeader
+        title="Browse books"
+        subtitle="Explore the catalogue and see what is on the shelf right now."
+        icon={LibraryBooksOutlinedIcon}
+        meta={
+          books && !loading && !error ? (
+            <Chip
+              size="small"
+              variant="outlined"
+              label={`${availableCount} of ${books.length} available${hasActiveSearch ? ' in this search' : ''}`}
+            />
+          ) : null
+        }
+      />
 
-      {/* Search Bar */}
-      <Card sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="h6" component="h2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterListIcon color="primary" sx={{ fontSize: 22 }} />
-            Search Catalog
-          </Typography>
-          {hasActiveSearch && (
-            <Button variant="text" startIcon={<ClearIcon />} size="small" onClick={handleClearSearch} color="secondary">
-              Clear search
-            </Button>
-          )}
-        </Box>
-        <Box component="form" onSubmit={handleSearch}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField label="Search by title" size="small" value={filters.search} onChange={(e) => setFilters({ search: e.target.value })} fullWidth />
-            <Button type="submit" variant="contained" startIcon={<SearchIcon />} sx={{ alignSelf: 'stretch', minWidth: 120 }}>
+      <Box component="form" onSubmit={handleSearch}>
+        <FilterBar
+          title="Search the catalogue"
+          columns={1}
+          activeCount={hasActiveSearch ? 1 : 0}
+          onClear={handleClearSearch}
+          actions={
+            <Button type="submit" size="small" variant="contained" startIcon={<SearchIcon sx={{ fontSize: 16 }} />}>
               Search
             </Button>
-          </Stack>
-        </Box>
-      </Card>
+          }
+        >
+          <TextField
+            label="Search by title"
+            value={filters.search}
+            onChange={(e) => setFilters({ search: e.target.value })}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 17, color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </FilterBar>
+      </Box>
 
       {loading ? (
-        <LoadingState label="Loading books…" />
+        <CardGridLoadingState count={6} />
       ) : error ? (
         <ErrorState message={getErrorMessage(error)} onRetry={reload} />
       ) : books && books.length === 0 ? (
-        <EmptyState title="No books found" description={query ? 'Try a different search.' : 'The catalog is currently empty.'} />
+        <EmptyState
+          title="No books found"
+          description={query ? 'No title matches that search. Try fewer or different words.' : 'The catalogue is currently empty.'}
+          icon={LibraryBooksOutlinedIcon}
+          action={
+            hasActiveSearch ? (
+              <Button variant="outlined" onClick={handleClearSearch}>
+                Clear search
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <Grid container spacing={2}>
           {(books || []).map((book) => {
             const available = book.available_quantity > 0
             return (
               <Grid item xs={12} sm={6} lg={4} key={book.id}>
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <Card
+                  sx={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    transition: 'border-color 180ms cubic-bezier(0.32, 0.72, 0, 1), transform 180ms cubic-bezier(0.32, 0.72, 0, 1)',
+                    '&:hover': { borderColor: 'primary.main', transform: 'translateY(-2px)' },
+                  }}
+                >
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, gap: 1.75 }}>
+                    <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
                       <Box
                         sx={{
-                          width: 42,
-                          height: 42,
+                          width: 38,
+                          height: 38,
                           borderRadius: 2,
                           flexShrink: 0,
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           bgcolor: 'primary.light',
-                          color: 'primary.dark',
+                          color: (t) => (t.palette.mode === 'light' ? 'primary.dark' : 'primary.main'),
                         }}
                       >
-                        <MenuBookOutlinedIcon fontSize="small" />
+                        <MenuBookOutlinedIcon sx={{ fontSize: 19 }} />
                       </Box>
                       <Box sx={{ minWidth: 0 }}>
-                        <Typography fontWeight={600} lineHeight={1.3}>
+                        <Typography variant="subtitle2" sx={{ lineHeight: 1.35 }}>
                           {book.title}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                           {book.author}
                         </Typography>
                       </Box>
-                    </Stack>
-                    <Box sx={{ mt: 2, display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-                      <Chip size="small" variant="outlined" label={book.category} />
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                      {book.category && <Chip size="small" variant="outlined" label={book.category} />}
                       <Chip
                         size="small"
                         color={available ? 'success' : 'error'}
-                        variant="outlined"
-                        label={available ? `${book.available_quantity} available` : 'Out of stock'}
+                        label={available ? `${book.available_quantity} available` : 'All copies out'}
                       />
                     </Box>
-                    {book.publisher && (
-                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-                        {book.publisher}
+
+                    <Box
+                      sx={{
+                        mt: 'auto',
+                        pt: 1.5,
+                        borderTop: '1px solid',
+                        borderColor: 'divider',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        gap: 1,
+                      }}
+                    >
+                      <Typography variant="caption" sx={{ color: 'text.secondary', minWidth: 0 }} noWrap>
+                        {book.publisher || 'Publisher not recorded'}
                         {book.publication_year ? `, ${book.publication_year}` : ''}
                       </Typography>
-                    )}
+                      <Typography
+                        variant="caption"
+                        sx={{ color: 'text.disabled', fontFamily: (t) => t.typography.fontFamilyMonospace, flexShrink: 0 }}
+                      >
+                        {book.isbn}
+                      </Typography>
+                    </Box>
                   </CardContent>
                 </Card>
               </Grid>

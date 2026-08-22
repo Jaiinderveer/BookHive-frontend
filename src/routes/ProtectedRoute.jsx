@@ -1,5 +1,6 @@
 import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
+import Typography from '@mui/material/Typography'
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext.jsx'
 
@@ -11,8 +12,21 @@ export default function ProtectedRoute() {
 
   if (loading) {
     return (
-      <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <CircularProgress />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2,
+          bgcolor: 'background.default',
+        }}
+      >
+        <CircularProgress size={28} thickness={4.5} />
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+          Restoring your session…
+        </Typography>
       </Box>
     )
   }

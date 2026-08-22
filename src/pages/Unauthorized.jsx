@@ -1,49 +1,44 @@
-import Box from '@mui/material/Box'
 import Button from '@mui/material/Button'
 import Typography from '@mui/material/Typography'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
+import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import SpaceDashboardOutlinedIcon from '@mui/icons-material/SpaceDashboardOutlined'
 import { useNavigate } from 'react-router-dom'
+import MessagePage from '../components/ui/MessagePage.jsx'
 
 export default function Unauthorized() {
   const navigate = useNavigate()
   return (
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        textAlign: 'center',
-        p: 3,
-        bgcolor: 'background.default',
-      }}
-    >
-      <Box
-        sx={{
-          width: 64,
-          height: 64,
-          borderRadius: '50%',
-          bgcolor: 'warning.light',
-          color: 'warning.dark',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          mb: 2,
-        }}
-      >
-        <LockOutlinedIcon />
-      </Box>
-      <Typography variant="h5" component="h1" gutterBottom>
-        Unauthorized
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 460, mb: 3 }}>
-        You don&apos;t have permission to access this page. If you believe this is a mistake,
-        contact your librarian.
-      </Typography>
-      <Button variant="contained" onClick={() => navigate('/dashboard')}>
-        Go to Dashboard
-      </Button>
-    </Box>
+    <MessagePage
+      icon={LockOutlinedIcon}
+      iconColor="warning"
+      code="403"
+      title="You don't have access"
+      description="This page is limited to a different role. If you think that's a mistake, ask your librarian to check your account."
+      actions={
+        <>
+          <Button
+            variant="contained"
+            startIcon={<SpaceDashboardOutlinedIcon sx={{ fontSize: 17 }} />}
+            onClick={() => navigate('/dashboard')}
+          >
+            Go to dashboard
+          </Button>
+          <Button
+            variant="outlined"
+            color="inherit"
+            startIcon={<ArrowBackIcon sx={{ fontSize: 17 }} />}
+            onClick={() => navigate(-1)}
+          >
+            Go back
+          </Button>
+        </>
+      }
+      footer={
+        <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+          BookHive · Library Management
+        </Typography>
+      }
+    />
   )
 }

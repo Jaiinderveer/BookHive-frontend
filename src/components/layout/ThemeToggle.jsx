@@ -1,4 +1,4 @@
-import React from 'react'
+import { useState } from 'react'
 import { useTheme } from '../../context/ThemeContext.jsx'
 import IconButton from '@mui/material/IconButton'
 import Tooltip from '@mui/material/Tooltip'
@@ -6,20 +6,20 @@ import Menu from '@mui/material/Menu'
 import MenuItem from '@mui/material/MenuItem'
 import ListItemIcon from '@mui/material/ListItemIcon'
 import Typography from '@mui/material/Typography'
-import Box from '@mui/material/Box'
-import Brightness7Icon from '@mui/icons-material/Brightness7'
-import Brightness4Icon from '@mui/icons-material/Brightness4'
-import BrightnessAutoIcon from '@mui/icons-material/BrightnessAuto'
+import CheckIcon from '@mui/icons-material/Check'
+import LightModeOutlinedIcon from '@mui/icons-material/LightModeOutlined'
+import DarkModeOutlinedIcon from '@mui/icons-material/DarkModeOutlined'
+import SettingsBrightnessOutlinedIcon from '@mui/icons-material/SettingsBrightnessOutlined'
 
 const MODES = [
-  { value: 'light', label: 'Light', icon: <Brightness7Icon fontSize="small" /> },
-  { value: 'dark', label: 'Dark', icon: <Brightness4Icon fontSize="small" /> },
-  { value: 'system', label: 'System', icon: <BrightnessAutoIcon fontSize="small" /> },
+  { value: 'light', label: 'Light', Icon: LightModeOutlinedIcon },
+  { value: 'dark', label: 'Dark', Icon: DarkModeOutlinedIcon },
+  { value: 'system', label: 'System', Icon: SettingsBrightnessOutlinedIcon },
 ]
 
 export default function ThemeToggle() {
-  const { mode, resolvedMode, setTheme } = useTheme()
-  const [anchorEl, setAnchorEl] = React.useState(null)
+  const { mode, setTheme } = useTheme()
+  const [anchorEl, setAnchorEl] = useState(null)
 
   const handleClick = (event) => setAnchorEl(event.currentTarget)
   const handleClose = () => setAnchorEl(null)
@@ -29,18 +29,19 @@ export default function ThemeToggle() {
   }
 
   const currentMode = MODES.find((m) => m.value === mode) || MODES[0]
+  const CurrentIcon = currentMode.Icon
 
   return (
-    <Box>
-      <Tooltip title={`Theme: ${currentMode.label}`} arrow>
+    <>
+      <Tooltip title={`Theme: ${currentMode.label}`}>
         <IconButton
           onClick={handleClick}
           size="small"
-          sx={{ borderRadius: 10 }}
           aria-haspopup="true"
           aria-label="Theme options"
+          sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary' } }}
         >
-          {currentMode.icon}
+          <CurrentIcon sx={{ fontSize: 19 }} />
         </IconButton>
       </Tooltip>
       <Menu
@@ -49,25 +50,20 @@ export default function ThemeToggle() {
         onClose={handleClose}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-        slotProps={{ paper: { sx: { minWidth: 180, mt: 0.5 } } }}
+        slotProps={{ paper: { sx: { minWidth: 176, mt: 0.75 } } }}
       >
-        {MODES.map((m) => (
-          <MenuItem
-            key={m.value}
-            onClick={() => handleSelect(m.value)}
-            selected={mode === m.value}
-            sx={{ px: 2, py: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}
-          >
-            <ListItemIcon sx={{ color: mode === m.value ? 'primary.main' : 'inherit' }}>
-              {m.icon}
+        {MODES.map(({ value, label, Icon }) => (
+          <MenuItem key={value} onClick={() => handleSelect(value)} selected={mode === value}>
+            <ListItemIcon sx={{ minWidth: 30, color: mode === value ? 'primary.main' : 'text.secondary' }}>
+              <Icon sx={{ fontSize: 18 }} />
             </ListItemIcon>
-            <Typography variant="body2">{m.label}</Typography>
-            {mode === m.value && (
-              <Box sx={{ ml: 'auto', width: 16, height: 16, borderRadius: '50%', bgcolor: 'primary.main' }} />
-            )}
+            <Typography variant="body2" sx={{ fontWeight: mode === value ? 600 : 450 }}>
+              {label}
+            </Typography>
+            {mode === value && <CheckIcon sx={{ ml: 'auto', fontSize: 16, color: 'primary.main' }} />}
           </MenuItem>
         ))}
       </Menu>
-    </Box>
+    </>
   )
 }

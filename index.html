@@ -4,7 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="BookHive — AI-powered Smart Library Management System" />
+    <meta name="theme-color" content="#f6f6f9" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e15" media="(prefers-color-scheme: dark)" />
     <title>BookHive</title>
+    <!--
+      Inter is the typeface the design system asks for in src/theme.js.
+      Preconnect first so the stylesheet request does not pay for a fresh
+      connection, and load only the weights the theme actually uses.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;600;700;800&display=swap"
+    />
+    <style>
+      /*
+        Paint the page background before React mounts so the first frame is not
+        a white flash in dark mode. ThemeContext writes data-theme on <html>
+        before hydration, so both selectors are available immediately.
+      */
+      html { background-color: #f6f6f9; }
+      html[data-theme='dark'] { background-color: #0e0e15; }
+      @media (prefers-color-scheme: dark) {
+        html:not([data-theme='light']) { background-color: #0e0e15; }
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

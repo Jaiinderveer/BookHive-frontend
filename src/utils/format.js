@@ -3,7 +3,7 @@
 
 const IST_TIMEZONE = 'Asia/Kolkata'
 
-function parseBackendDate(value) {
+export function parseBackendDate(value) {
   if (!value) return null
 
   if (value instanceof Date) {
@@ -68,7 +68,7 @@ const IST_DATE_PARTS = new Intl.DateTimeFormat('en-CA', {
   timeZone: IST_TIMEZONE,
 })
 
-function istDateKey(date) {
+export function istDateKey(date) {
   const parts = {}
   for (const part of IST_DATE_PARTS.formatToParts(date)) {
     parts[part.type] = part.value
@@ -104,4 +104,49 @@ export function initials(name = '') {
     .slice(0, 2)
     .map((part) => part[0].toUpperCase())
     .join('')
+}
+
+// Clock time only (IST) — used where the date is already implied by grouping.
+export function formatTime(value) {
+  const date = parseBackendDate(value)
+  if (!date) return '—'
+
+  return date.toLocaleTimeString(undefined, {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: IST_TIMEZONE,
+  })
+}
+
+// Short "how long ago" label for activity feeds. Falls back to the absolute
+// date once an entry is old enough that a relative label stops being useful.
+export function formatRelativeTime(value) {
+  const date = parseBackendDate(value)
+  if (!date) return '—'
+
+  const seconds = Math.round((Date.now() - date.getTime()) / 1000)
+  if (seconds < 45) return 'just now'
+  if (seconds < 90) return '1 min ago'
+
+  const minutes = Math.round(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours} hr${hours === 1 ? '' : 's'} ago`
+
+  const days = Math.round(hours / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days} days ago`
+
+  return formatDate(date)
+}
+
+// Weekday abbreviation for an instant, on the IST calendar.
+const IST_WEEKDAY = new Intl.DateTimeFormat(undefined, {
+  weekday: 'short',
+  timeZone: IST_TIMEZONE,
+})
+
+export function istWeekdayLabel(date) {
+  return IST_WEEKDAY.format(date)
 }

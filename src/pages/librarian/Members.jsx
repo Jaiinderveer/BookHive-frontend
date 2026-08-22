@@ -4,31 +4,41 @@ import Button from '@mui/material/Button'
 import IconButton from '@mui/material/IconButton'
 import Stack from '@mui/material/Stack'
 import TextField from '@mui/material/TextField'
+import Tooltip from '@mui/material/Tooltip'
 import Typography from '@mui/material/Typography'
 import Chip from '@mui/material/Chip'
-import Avatar from '@mui/material/Avatar'
+import Snackbar from '@mui/material/Snackbar'
+import Alert from '@mui/material/Alert'
+import InputAdornment from '@mui/material/InputAdornment'
+
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
 import AddIcon from '@mui/icons-material/Add'
 import SearchIcon from '@mui/icons-material/Search'
-import FilterListIcon from '@mui/icons-material/FilterList'
-import ClearIcon from '@mui/icons-material/Clear'
-import PhoneIcon from '@mui/icons-material/Phone'
-import CheckCircleOutlinedIcon from '@mui/icons-material/CheckCircleOutlined'
-import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined'
-import Snackbar from '@mui/material/Snackbar'
-import Alert from '@mui/material/Alert'
-import Card from '@mui/material/Card'
-import CardContent from '@mui/material/CardContent'
+import PhoneOutlinedIcon from '@mui/icons-material/PhoneOutlined'
+import MailOutlineIcon from '@mui/icons-material/MailOutline'
+import PeopleOutlineIcon from '@mui/icons-material/PeopleOutline'
+import EventAvailableOutlinedIcon from '@mui/icons-material/EventAvailableOutlined'
+
 import { getMembers, deleteMember } from '../../services/memberService.js'
 import { useAsync } from '../../hooks/useAsync.js'
 import { getErrorMessage } from '../../services/apiClient.js'
 import { formatDate, initials } from '../../utils/format.js'
 import PageHeader from '../../components/ui/PageHeader.jsx'
 import ResponsiveTable from '../../components/ui/ResponsiveTable.jsx'
+import FilterBar from '../../components/ui/FilterBar.jsx'
+import EntityCell from '../../components/ui/EntityCell.jsx'
 import { LoadingState, EmptyState, ErrorState } from '../../components/ui/StateViews.jsx'
 import ConfirmDialog from '../../components/ui/ConfirmDialog.jsx'
 import MemberFormDialog from './MemberFormDialog.jsx'
+
+function AccountChip({ member }) {
+  return member.user_id ? (
+    <Chip size="small" color="success" variant="outlined" label="Login enabled" />
+  ) : (
+    <Chip size="small" color="warning" variant="outlined" label="No login" />
+  )
+}
 
 export default function Members() {
   const [search, setSearch] = useState('')
@@ -54,6 +64,7 @@ export default function Members() {
   })
 
   const hasActiveSearch = Boolean(query)
+  const withLogin = members.filter((m) => m.user_id).length
 
   const handleSearch = (e) => {
     e.preventDefault()
@@ -88,154 +99,241 @@ export default function Members() {
     reload()
   }
 
-  /*__JSX2__*/
+  const openEdit = (member) => {
+    setEditing(member)
+    setFormOpen(true)
+  }
+
+  const rowActions = (m) => (
+    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+      <Tooltip title="Edit member">
+        <IconButton size="small" onClick={() => openEdit(m)} aria-label="Edit member" sx={{ color: 'text.secondary' }}>
+          <EditOutlinedIcon sx={{ fontSize: 17 }} />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Delete member">
+        <IconButton size="small" color="error" onClick={() => setDeleting(m)} aria-label="Delete member">
+          <DeleteOutlineIcon sx={{ fontSize: 17 }} />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  )
+
   const columns = [
     {
       id: 'name',
       label: 'Member',
-      render: (m) => (
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.light', color: 'primary.dark', fontSize: 14 }}>{initials(m.name)}</Avatar>
-          <Box>
-            <Typography fontWeight={600} variant="body1">{m.name}</Typography>
-            <Typography variant="body2" color="text.secondary">{m.email}</Typography>
-          </Box>
-        </Stack>
-      ),
-    },
-    { id: 'membership', label: 'Membership ID', render: (m) => <Typography variant="body2" color="text.secondary">{m.membership_id}</Typography> },
-    { id: 'phone', label: 'Phone', render: (m) => m.phone },
-    { id: 'joined', label: 'Joined', render: (m) => formatDate(m.created_at) },
-    {
-      id: 'account',
-      label: 'Account',
-      render: (m) =>
-        m.user_id ? (
-          <Chip size="small" color="success" variant="outlined" label="Login enabled" />
-        ) : (
-          <Chip size="small" color="warning" variant="outlined" label="Login not enabled" />
-        ),
+      minWidth: 240,
+      render: (m) => <EntityCell initials={initials(m.name)} title={m.name} subtitle={m.email} />,
     },
     {
-      id: 'actions',
-      label: '',
-      align: 'right',
+      id: 'membership',
+      label: 'Membership ID',
       render: (m) => (
-        <Stack direction="row" justifyContent="flex-end">
-          <IconButton aria-label="Edit" onClick={() => { setEditing(m); setFormOpen(true); }}>
-            <EditOutlinedIcon fontSize="small" />
-          </IconButton>
-          <IconButton aria-label="Delete" color="error" onClick={() => setDeleting(m)}>
-            <DeleteOutlineIcon fontSize="small" />
-          </IconButton>
-        </Stack>
+        <Typography
+          variant="body2"
+          sx={{ fontFamily: (t) => t.typography.fontFamilyMonospace, fontSize: '0.8125rem', color: 'text.secondary' }}
+        >
+          {m.membership_id}
+        </Typography>
       ),
     },
+    {
+      id: 'phone',
+      label: 'Phone',
+      render: (m) => (
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {m.phone || '—'}
+        </Typography>
+      ),
+    },
+    {
+      id: 'joined',
+      label: 'Joined',
+      render: (m) => (
+        <Typography variant="body2" color="text.secondary" noWrap>
+          {formatDate(m.created_at)}
+        </Typography>
+      ),
+    },
+    { id: 'account', label: 'Account', render: (m) => <AccountChip member={m} /> },
+    { id: 'actions', label: '', align: 'right', width: 96, render: rowActions },
   ]
 
-  const renderCard = (m) => {
-    const hasLogin = Boolean(m.user_id)
-    return (
-      <Card sx={{ height: '100%', transition: 'transform 0.2s ease, box-shadow 0.2s ease', '&:hover': { transform: 'translateY(-2px)' } }}>
-        <CardContent sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
-            <Avatar sx={{ width: 48, height: 48, bgcolor: 'primary.light', color: 'primary.dark', flexShrink: 0 }}>{initials(m.name)}</Avatar>
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant="h6" fontWeight={700} gutterBottom lineHeight={1.3}>
-                {m.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                {m.email}
-              </Typography>
-              <Stack direction="row" spacing={1.5} flexWrap="wrap" mt={1} alignItems="center">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', fontSize: '0.75rem', fontWeight: 500 }}>
-                  <PhoneIcon fontSize="small" sx={{ color: 'text.secondary', opacity: 0.7 }} />
-                  <Typography variant="body2" component="span" sx={{ whiteSpace: 'nowrap' }}>{m.phone}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  {hasLogin ? (
-                    <>
-                      <CheckCircleOutlinedIcon fontSize="small" sx={{ color: 'success.main' }} />
-                      <Typography variant="body2" component="span" color="success.main" fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>Login enabled</Typography>
-                    </>
-                  ) : (
-                    <>
-                      <CancelOutlinedIcon fontSize="small" sx={{ color: 'error.main' }} />
-                      <Typography variant="body2" component="span" color="error.main" fontWeight={500} sx={{ whiteSpace: 'nowrap' }}>Login not enabled</Typography>
-                    </>
-                  )}
-                </Box>
-              </Stack>
-            </Box>
-            <Box sx={{ display: 'flex', gap: 0.5, flexShrink: 0 }}>
-              <IconButton size="small" onClick={() => { setEditing(m); setFormOpen(true); }} aria-label="Edit member">
-                <EditOutlinedIcon fontSize="small" />
-              </IconButton>
-              <IconButton size="small" color="error" onClick={() => setDeleting(m)} aria-label="Delete member">
-                <DeleteOutlineIcon fontSize="small" />
-              </IconButton>
-            </Box>
-          </Box>
-        </CardContent>
-      </Card>
-    )
-  }
+  const renderCard = (m) => (
+    <Box>
+      <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1.5 }}>
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+          <EntityCell
+            initials={initials(m.name)}
+            size={40}
+            title={m.name}
+            subtitle={m.membership_id}
+            titleProps={{ fontSize: '0.9375rem' }}
+          />
+        </Box>
+        <Box sx={{ flexShrink: 0 }}>{rowActions(m)}</Box>
+      </Box>
+
+      <Stack spacing={0.75} sx={{ mt: 1.75 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <MailOutlineIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+          <Typography variant="body2" color="text.secondary" noWrap>
+            {m.email}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <PhoneOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+          <Typography variant="body2" color="text.secondary">
+            {m.phone || '—'}
+          </Typography>
+        </Box>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <EventAvailableOutlinedIcon sx={{ fontSize: 15, color: 'text.disabled' }} />
+          <Typography variant="body2" color="text.secondary">
+            Joined {formatDate(m.created_at)}
+          </Typography>
+        </Box>
+      </Stack>
+
+      <Box sx={{ mt: 1.5 }}>
+        <AccountChip member={m} />
+      </Box>
+    </Box>
+  )
 
   return (
     <Box>
       <PageHeader
         title="Members"
-        subtitle="Manage library members"
-        actions={<Button variant="contained" startIcon={<AddIcon />} onClick={() => { setEditing(null); setFormOpen(true); }}>Add Member</Button>}
+        subtitle="Manage library memberships and account access."
+        icon={PeopleOutlineIcon}
+        meta={
+          allMembers && !loading && !error ? (
+            <Stack direction="row" spacing={1}>
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`${members.length} ${members.length === 1 ? 'member' : 'members'}${hasActiveSearch ? ' matching' : ''}`}
+              />
+              <Chip size="small" variant="outlined" color="success" label={`${withLogin} with login`} />
+            </Stack>
+          ) : null
+        }
+        actions={
+          <Button
+            variant="contained"
+            startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+            onClick={() => {
+              setEditing(null)
+              setFormOpen(true)
+            }}
+          >
+            Add member
+          </Button>
+        }
       />
 
-      {/* Search Bar */}
-      <Card sx={{ p: 2, mb: 2 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2, flexWrap: 'wrap', gap: 1 }}>
-          <Typography variant="h6" component="h2" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterListIcon color="primary" sx={{ fontSize: 22 }} />
-            Search Members
-          </Typography>
-          {hasActiveSearch && (
-            <Button variant="text" startIcon={<ClearIcon />} size="small" onClick={handleClearSearch} color="secondary">
-              Clear search
-            </Button>
-          )}
-        </Box>
-        <Box component="form" onSubmit={handleSearch}>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-            <TextField label="Search by name, email, phone or membership ID" size="small" value={search} onChange={(e) => setSearch(e.target.value)} fullWidth />
-            <Button type="submit" variant="contained" startIcon={<SearchIcon />} sx={{ alignSelf: 'stretch', minWidth: 120 }}>
+      <Box component="form" onSubmit={handleSearch}>
+        <FilterBar
+          title="Find a member"
+          columns={1}
+          activeCount={hasActiveSearch ? 1 : 0}
+          onClear={handleClearSearch}
+          actions={
+            <Button type="submit" size="small" variant="contained" startIcon={<SearchIcon sx={{ fontSize: 16 }} />}>
               Search
             </Button>
-          </Stack>
-        </Box>
-      </Card>
+          }
+        >
+          <TextField
+            label="Name, email, phone or membership ID"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            fullWidth
+            InputProps={{
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon sx={{ fontSize: 17, color: 'text.disabled' }} />
+                </InputAdornment>
+              ),
+            }}
+          />
+        </FilterBar>
+      </Box>
 
       {loading ? (
         <LoadingState label="Loading members…" />
       ) : error ? (
         <ErrorState message={getErrorMessage(error)} onRetry={reload} />
       ) : members.length === 0 ? (
-        <EmptyState title="No members found" description={query ? 'Try adjusting your search.' : 'Add members to get started.'} />
+        <EmptyState
+          title="No members found"
+          description={
+            hasActiveSearch
+              ? 'No member matches that search. Try a different name, email or membership ID.'
+              : 'Add your first member to start issuing books.'
+          }
+          icon={PeopleOutlineIcon}
+          action={
+            hasActiveSearch ? (
+              <Button variant="outlined" onClick={handleClearSearch}>
+                Clear search
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                startIcon={<AddIcon sx={{ fontSize: 18 }} />}
+                onClick={() => {
+                  setEditing(null)
+                  setFormOpen(true)
+                }}
+              >
+                Add member
+              </Button>
+            )
+          }
+        />
       ) : (
-        <ResponsiveTable columns={columns} rows={members} getRowKey={(m) => m.id} renderCard={renderCard} />
+        <ResponsiveTable
+          columns={columns}
+          rows={members}
+          getRowKey={(m) => m.id}
+          renderCard={renderCard}
+          footer={`${members.length} ${members.length === 1 ? 'member' : 'members'} shown`}
+        />
       )}
 
-      {formOpen && <MemberFormDialog member={editing} onClose={() => { setFormOpen(false); setEditing(null); }} onSaved={handleSaved} />}
+      {formOpen && (
+        <MemberFormDialog
+          member={editing}
+          onClose={() => {
+            setFormOpen(false)
+            setEditing(null)
+          }}
+          onSaved={handleSaved}
+        />
+      )}
 
       <ConfirmDialog
         open={Boolean(deleting)}
-        title="Delete member?"
-        message={deleting ? `Are you sure you want to delete "${deleting.name}"? This cannot be undone.` : ''}
-        confirmLabel="Delete"
+        title="Delete this member?"
+        message={deleting ? `“${deleting.name}” will be removed from the member list. This cannot be undone.` : ''}
+        confirmLabel="Delete member"
         onConfirm={handleDelete}
         onCancel={() => setDeleting(null)}
         loading={deleteLoading}
       />
 
-      <Snackbar open={Boolean(snack)} autoHideDuration={4000} onClose={() => setSnack(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
-        <Alert onClose={() => setSnack(null)} severity={snack?.severity || 'info'} sx={{ width: '100%' }}>{snack?.message}</Alert>
+      <Snackbar
+        open={Boolean(snack)}
+        autoHideDuration={4000}
+        onClose={() => setSnack(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnack(null)} severity={snack?.severity || 'info'} sx={{ width: '100%' }}>
+          {snack?.message}
+        </Alert>
       </Snackbar>
     </Box>
   )
