@@ -31,7 +31,7 @@ import PageHeader from '../../components/ui/PageHeader.jsx'
 import { useAI } from '../../context/AIContext.jsx'
 import { getBooks } from '../../services/bookService.js'
 import { getMembers } from '../../services/memberService.js'
-import { formatDate } from '../../utils/format.js'
+import { formatDate, isOverdue } from '../../utils/format.js'
 
 const uid = () =>
   crypto.randomUUID
@@ -318,7 +318,9 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
               dueDate: t.due_date,
               returnDate: t.return_date,
               fine: t.fine ?? 0,
-              overdue: t.status === 'Issued' && t.due_date ? new Date(t.due_date) < new Date() : false,
+              // Shared IST calendar-date rule, so this flag agrees with both
+              // the backend and every other screen.
+              overdue: isOverdue(t.due_date, t.status),
             }
           })
 

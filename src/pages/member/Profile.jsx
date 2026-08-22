@@ -18,6 +18,10 @@ import { initials } from '../../utils/format.js'
 
 export default function Profile() {
   const { user, refreshUser } = useAuth()
+  // Name, phone and address are stored on the borrower profile, which librarian
+  // accounts do not have. For them the backend can only save the email address,
+  // so those fields are read-only here rather than appearing to save.
+  const isLibrarian = user?.role === 'librarian'
   const [form, setForm] = useState({
     name: user?.name || '',
     email: user?.email || '',
@@ -46,7 +50,11 @@ export default function Profile() {
     e.preventDefault()
     setError(null)
     setSuccess(null)
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
+    if (!form.email.trim()) {
+      setError('Please enter an email address.')
+      return
+    }
+    if (!isLibrarian && (!form.name.trim() || !form.phone.trim())) {
       setError('Please fill in name, email, and phone.')
       return
     }
@@ -56,13 +64,19 @@ export default function Profile() {
     }
     setSaving(true)
     try {
-      await updateMe({
-        name: form.name.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        address: form.address.trim() || null,
-      })
-      setSuccess('Profile updated successfully.')
+      // Only send what this account can actually store, so the success message
+      // never claims a field was saved when it was not.
+      await updateMe(
+        isLibrarian
+          ? { email: form.email.trim() }
+          : {
+              name: form.name.trim(),
+              email: form.email.trim(),
+              phone: form.phone.trim(),
+              address: form.address.trim() || null,
+            },
+      )
+      setSuccess(isLibrarian ? 'Email updated successfully.' : 'Profile updated successfully.')
       await refreshUser()
     } catch (err) {
       setError(getErrorMessage(err))
@@ -141,14 +155,32 @@ export default function Profile() {
             <Box component="form" onSubmit={handleSaveProfile}>
               <Stack spacing={2}>
                 <Typography variant="h6" fontWeight={700} gutterBottom>Personal Information</Typography>
-                <TextField label="Full Name" name="name" value={form.name} onChange={handleChange} required fullWidth />
+                <TextField
+                  label="Full Name"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  required={!isLibrarian}
+                  disabled={isLibrarian}
+                  helperText={isLibrarian ? 'Librarian accounts can only change the email address.' : undefined}
+                  fullWidth
+                />
                 <TextField label="Email" name="email" type="email" value={form.email} onChange={handleChange} required fullWidth />
-                <TextField label="Phone" name="phone" value={form.phone} onChange={handleChange} required fullWidth />
+                <TextField
+                  label="Phone"
+                  name="phone"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required={!isLibrarian}
+                  disabled={isLibrarian}
+                  fullWidth
+                />
                 <TextField
                   label="Address"
                   name="address"
                   value={form.address}
                   onChange={handleChange}
+                  disabled={isLibrarian}
                   fullWidth
                   multiline
                   minRows={3}
