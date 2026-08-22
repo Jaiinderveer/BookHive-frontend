@@ -87,7 +87,24 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
   const formatted = []
 
   for (const tool of tools) {
-    if (!tool?.success) continue
+    if (!tool || typeof tool !== 'object') continue
+
+    /*
+     * A failed tool must stay visible. Silently dropping it here is what let a
+     * partial failure read as a complete success: the successful tool produced a
+     * card, the failed one produced nothing, and the model's text was the only
+     * account of the failure.
+     */
+    if (!tool.success) {
+      const operation = tool.tool ? `${formatLabel(tool.tool)} failed` : 'Operation failed'
+      const reason =
+        typeof tool.error === 'string' && tool.error.trim()
+          ? tool.error.trim()
+          : 'The operation could not be completed.'
+
+      formatted.push({ type: 'error', title: operation, message: reason })
+      continue
+    }
 
     const result = tool.result
     if (result == null || result === '') continue
@@ -426,12 +443,15 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
   }
 
   // Prevent duplicate empty-state/result cards when the model/backend returns
-  // the same successful tool result more than once.
+  // the same successful tool result more than once. Identical failures are
+  // deduplicated the same way, since the model may retry a failing tool.
+  const isDeduped = (item) => item?.type === 'message' || item?.type === 'error'
+
   const unique = formatted.filter((item, index, arr) => {
-    if (item?.type !== 'message') return true
+    if (!isDeduped(item)) return true
     const key = `${item.type}|${item.title}|${item.message}`
     return arr.findIndex((candidate) =>
-      candidate?.type === 'message' &&
+      isDeduped(candidate) &&
       `${candidate.type}|${candidate.title}|${candidate.message}` === key
     ) === index
   })
@@ -440,7 +460,7 @@ function formatToolResults(tools, userQuery = '', books = [], members = []) {
 }
 
 function removeInternalIds(value) {
-  const hiddenKeys = new Set(['id', '_id', 'book_id', 'member_id', 'transaction_id', 'created_at'])
+  const hiddenKeys = new Set(['id', '_id', 'book_id', 'member_id', 'transaction_id', 'user_id', 'created_at'])
 
   if (Array.isArray(value)) return value.map(removeInternalIds)
 
@@ -607,7 +627,6 @@ export default function AIAssistant() {
     error,
     suggestedPrompts,
     addMessage,
-    setMessages,
     clearMessages,
     setError,
     clearError,
@@ -642,19 +661,30 @@ export default function AIAssistant() {
     return () => { cancelled = true }
   }, [])
 
-  // Keep refs in sync with state for formatToolResults
-  booksRef.current = books
-  membersRef.current = members
-
+  // Latest-value refs, synced after commit by the effect below.
   const messagesRef = useRef(messages)
   const sendingRef = useRef(sending)
   const failedIdRef = useRef(failedId)
   const inputRef = useRef(input)
 
-  messagesRef.current = messages
-  sendingRef.current = sending
-  failedIdRef.current = failedId
-  inputRef.current = input
+  /*
+   * These refs let handleSend/handleRetry keep a stable identity (useCallback
+   * with no deps) while still reading the newest state. They are read only from
+   * event handlers and async callbacks — never during render — so syncing them
+   * after commit is both sufficient and safe under concurrent rendering, where
+   * a render may be thrown away before it ever commits.
+   *
+   * No dependency array on purpose: every commit re-syncs every ref, so none of
+   * them can silently go stale.
+   */
+  useEffect(() => {
+    booksRef.current = books
+    membersRef.current = members
+    messagesRef.current = messages
+    sendingRef.current = sending
+    failedIdRef.current = failedId
+    inputRef.current = input
+  })
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({
@@ -669,26 +699,57 @@ export default function AIAssistant() {
     setFailedId(null)
 
     try {
-      const res = await sendChat(text, history)
+      let res
 
-      // Use refs for latest books/members - never block AI response on reference data loading
-      const toolResults = formatToolResults(
-        res.tool_results || [],
-        text,
-        booksRef.current,
-        membersRef.current
-      )
+      try {
+        res = await sendChat(text, history)
+      } catch (err) {
+        // Network error, timeout, HTTP error or backend failure. Nothing ran to
+        // completion, so the question stays retryable and no assistant message
+        // is added — a failed request must never look like an answer.
+        setError(getErrorMessage(err))
+        setFailedId(userId)
+        return
+      }
+
+      /*
+       * The request itself succeeded. From here on nothing may be reported as a
+       * failed request: offering "Retry" after the backend already performed an
+       * operation would re-run it (duplicate issue/return/create).
+       */
+      const rawResults = Array.isArray(res?.tool_results) ? res.tool_results : []
+      const reply = typeof res?.reply === 'string' ? res.reply : ''
+
+      let toolResults = null
+      try {
+        toolResults = formatToolResults(
+          rawResults,
+          text,
+          booksRef.current,
+          membersRef.current
+        )
+      } catch (formatErr) {
+        // A malformed tool payload must not discard the model's reply.
+        console.warn('Failed to format tool results:', formatErr)
+        toolResults = null
+      }
+
+      if (!reply.trim() && !toolResults) {
+        // Nothing to show: no text and nothing renderable. Report it instead of
+        // leaving an empty assistant bubble that reads as a successful answer.
+        setError('The assistant did not return a usable response. Please try again.')
+        setFailedId(userId)
+        return
+      }
 
       addMessage({
         id: uid(),
         role: 'assistant',
-        content: res.reply,
+        content: reply,
         toolResults,
       })
-    } catch (err) {
-      setError(getErrorMessage(err))
-      setFailedId(userId)
     } finally {
+      // Every path resets the loading state, including an unexpected throw.
       setSending(false)
     }
   }
@@ -720,17 +781,17 @@ export default function AIAssistant() {
 
     if (!failed) return
 
+    /*
+     * History must exclude the question being resent, because it is sent
+     * separately as the message. The question itself stays in the transcript so
+     * a successful retry reads as question -> answer, and a second failure can
+     * still anchor its error banner and Retry button to the same message.
+     */
     const history = buildHistory(
-      messagesRef.current.filter(
-        (m) => m.id !== failedIdRef.current
-      )
+      messagesRef.current.filter((m) => m.id !== failed.id)
     )
 
-    setMessages((prev) =>
-      prev.filter((m) => m.id !== failedIdRef.current)
-    )
-
-    sendRequest(failed.content, history)
+    sendRequest(failed.content, history, failed.id)
   }, [])
 
   const handleKeyDown = (e) => {
@@ -875,6 +936,16 @@ export default function AIAssistant() {
                 // lists, IDs, "No records found" text, and generic summaries.
                 const hasToolResults = structuredResults.length > 0
 
+                /*
+                 * A failure explanation is prose, not data, so the cards must not
+                 * replace it: when any operation failed, keep the model's own
+                 * account of what went wrong next to the error card.
+                 */
+                const hasFailedResults = structuredResults.some(
+                  (tr) => tr?.type === 'error'
+                )
+                const showReplyText = !hasToolResults || hasFailedResults
+
                 // Filter generic completion sentences from AI responses.
                 const filterGenericCompletion = (content) => {
                   if (!content) return ''
@@ -1000,12 +1071,13 @@ export default function AIAssistant() {
                             </Box>
                           )}
 
-                          {/* 
+                          {/*
                               The tool card is authoritative whenever a tool returned
                               structured output. Only show the model's plain-text/Markdown
-                              reply when there is no tool result to render.
+                              reply when there is no tool result to render, or when an
+                              operation failed and the explanation matters.
                             */}
-                          {!hasToolResults && (() => {
+                          {showReplyText && (() => {
                             const filtered = filterGenericCompletion(msg.content)
                             if (!filtered) return null
 
@@ -1027,37 +1099,44 @@ export default function AIAssistant() {
                               </Box>
                             )
                           })()}
-                          {msg.id === failedId && (
-                            <Box
-                              sx={{
-                                mt: 1,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 1,
-                                width: '100%',
-                              }}
-                            >
-                              <Alert
-                                severity="error"
-                                sx={{
-                                  flex: 1,
-                                  borderRadius: 2,
-                                }}
-                              >
-                                {error}
-                              </Alert>
-
-                              <Button
-                                size="small"
-                                color="primary"
-                                onClick={handleRetry}
-                                disabled={sending}
-                              >
-                                Retry
-                              </Button>
-                            </Box>
-                          )}
                         </>
+                      )}
+
+                      {/*
+                          The failure banner belongs to the question that failed, and
+                          failedId holds a *user* message id — so it must sit outside
+                          the assistant-only branch above, where it could never match
+                          and the error was therefore never shown at all.
+                        */}
+                      {msg.id === failedId && error && (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 1,
+                            width: '100%',
+                          }}
+                        >
+                          <Alert
+                            severity="error"
+                            sx={{
+                              flex: 1,
+                              borderRadius: 2,
+                            }}
+                          >
+                            {error}
+                          </Alert>
+
+                          <Button
+                            size="small"
+                            color="primary"
+                            onClick={handleRetry}
+                            disabled={sending}
+                          >
+                            Retry
+                          </Button>
+                        </Box>
                       )}
                     </Box>
                   </Box>
@@ -1497,6 +1576,15 @@ function ToolResultCard({
       return (
         <Alert severity="success" sx={{ borderRadius: 2.5 }}>
           {formatValue(message)}
+        </Alert>
+      )
+
+    case 'error':
+      // formatValue keeps this safe for any value shape, so a non-string can
+      // never be iterated character by character.
+      return (
+        <Alert severity="error" sx={{ borderRadius: 2.5 }}>
+          {title ? `${formatValue(title)}: ${formatValue(message)}` : formatValue(message)}
         </Alert>
       )
 
