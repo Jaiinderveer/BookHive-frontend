@@ -50,12 +50,23 @@ function AIProvider({ children }) {
   const [suggestedPrompts, setSuggestedPrompts] = useState([])
 
   // Persist conversation.
+  //
+  // An empty conversation removes the key rather than storing "[]". This effect
+  // runs *after* the re-render caused by setMessages([]), so an unconditional
+  // write here would undo the localStorage.removeItem() performed when a session
+  // is cleared and leave the entry behind on every logout. A missing key and
+  // "[]" are indistinguishable to loadStoredMessages(), so persistence across an
+  // ordinary page refresh is unchanged.
   useEffect(() => {
     try {
-      localStorage.setItem(
-        AI_STORAGE_KEY,
-        JSON.stringify(messages)
-      )
+      if (messages.length === 0) {
+        localStorage.removeItem(AI_STORAGE_KEY)
+      } else {
+        localStorage.setItem(
+          AI_STORAGE_KEY,
+          JSON.stringify(messages)
+        )
+      }
     } catch (error) {
       console.warn('Failed to save AI conversation:', error)
     }

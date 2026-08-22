@@ -6,8 +6,9 @@ import { isTokenExpired } from '../services/apiClient.js'
 const AuthContext = createContext(null)
 
 // Tell session-scoped stores (e.g. the AI conversation) to drop their data.
-// Used on logout and on a fresh sign-in so one user's data can never be shown
-// to the next user on a shared machine.
+// Used on every end of a session (sign-out, token expiry, a 401) and on a fresh
+// sign-in, so one user's data can never be shown to the next user on a shared
+// machine.
 function notifySessionCleared() {
   window.dispatchEvent(new CustomEvent('bookhive:session-cleared'))
 }
@@ -19,6 +20,17 @@ export function AuthProvider({ children }) {
   const [validating, setValidating] = useState(false)
   
   const validatingRef = useRef(false)
+
+  // Every path that ends a session must go through here. Signing out announced
+  // the change but the involuntary paths (token expiry, a 401 from the API) only
+  // dropped the user and token, so session-scoped stores such as the AI
+  // conversation were never told to discard their data.
+  const clearSession = useCallback(() => {
+    localStorage.removeItem(TOKEN_KEY)
+    setToken(null)
+    setUser(null)
+    notifySessionCleared()
+  }, [])
 
   // Validate an existing session on app load (or when a token appears).
   const validateSession = useCallback(async () => {
@@ -33,9 +45,7 @@ export function AuthProvider({ children }) {
 
     // Check if token is expired before making API call
     if (isTokenExpired(token)) {
-      localStorage.removeItem(TOKEN_KEY)
-      setUser(null)
-      setToken(null)
+      clearSession()
       setLoading(false)
       return
     }
@@ -53,14 +63,12 @@ export function AuthProvider({ children }) {
       setUser(me)
     } catch {
       // 401 already clears the token via the interceptor.
-      setUser(null)
-      localStorage.removeItem(TOKEN_KEY)
-      setToken(null)
+      clearSession()
     } finally {
       setLoading(false)
       validatingRef.current = false
     }
-  }, [])
+  }, [clearSession])
 
   // Validate session on mount
   useEffect(() => {
@@ -83,12 +91,11 @@ export function AuthProvider({ children }) {
   // React to globally emitted 401 events (from the API client).
   useEffect(() => {
     const onUnauthorized = () => {
-      setUser(null)
-      setToken(null)
+      clearSession()
     }
     window.addEventListener('bookhive:unauthorized', onUnauthorized)
     return () => window.removeEventListener('bookhive:unauthorized', onUnauthorized)
-  }, [])
+  }, [clearSession])
 
   const login = useCallback(async (username, password) => {
     const data = await authService.login(username, password)
@@ -109,11 +116,8 @@ export function AuthProvider({ children }) {
   }, [login])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(TOKEN_KEY)
-    setToken(null)
-    setUser(null)
-    notifySessionCleared()
-  }, [])
+    clearSession()
+  }, [clearSession])
 
   const value = useMemo(
     () => ({
